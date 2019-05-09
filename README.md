@@ -1,12 +1,11 @@
 # Project Layout
 https://github.com/golang-standards/project-layout
 
-# Make
-https://github.com/cloudflare/hellogopher
-https://vincent.bernat.ch/en/blog/2017-makefile-build-golang
-
 # AWS
-https://docs.aws.amazon.com/sdk-for-go/index.html
+https://docs.aws.amazon.com/sdk-for-go/api/index.html
 
 # Vendoring
 https://golang.github.io/dep/
+
+# Presigned S3
+https://docs.aws.amazon.com/sdk-for-go/v1/developer-guide/s3-example-presigned-urls.html
