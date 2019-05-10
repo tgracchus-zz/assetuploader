@@ -1,47 +1,146 @@
 package aws
 
 import (
+	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/aws/signer/v4"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/google/uuid"
-	"log"
+	"github.com/pkg/errors"
+	"github.com/tgracchus/assertuploader/pkg/auerrors"
+	"net/http/httptest"
 	"net/url"
+	"strings"
 	"time"
 )
 
-func NewAwsSession(region string) *session.Session {
+const ErrorEmptyAWSCredentials = "ErrorEmptyAWSCredentials"
+const ErrorNoAWSCredentials = "ErrorNoAWSCredentials"
+
+var emptyCredentials = credentials.Credentials{}
+
+func NewAwsSession(region string, cred *credentials.Credentials) (*session.Session, error) {
+	if cred == nil {
+		return nil, auerrors.New(ErrorNoAWSCredentials, "Credentials are nil")
+	}
+	if *cred == emptyCredentials {
+		return nil, auerrors.New(ErrorEmptyAWSCredentials, "Credentials are empty")
+	}
 	return session.Must(session.NewSession(
 		&aws.Config{
 			Region:      aws.String(region),
-			Credentials: credentials.NewEnvCredentials(),
-		}))
+			Credentials: cred,
+		})), nil
 }
 
-func NewPoster(sess *session.Session) (*Poster, error) {
+func NewS3Manager(sess *session.Session) (*S3Manager, error) {
 	s3 := s3.New(sess)
-	return &Poster{s3}, nil
+	return &S3Manager{s3}, nil
 }
 
-type Poster struct {
+type S3Manager struct {
 	svc *s3.S3
 }
 
-func (ps *Poster) PostIt(bucket string, assetId uuid.UUID) (*url.URL, error) {
-	req, _ := ps.svc.PutObjectRequest(&s3.PutObjectInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(assetId.String()),
-	})
-	postUrlString, err := req.Presign(15 * time.Minute)
+func (ps *S3Manager) PostItA(bucket string, assetId uuid.UUID) (*url.URL, error) {
+	// Create signed url
+	signer := v4.NewSigner(credentials.NewEnvCredentials())
+	req := httptest.NewRequest("PUT", "https://assertuploader.s3.eu-west-1.amazonaws.com/"+assetId.String(), strings.NewReader("CONTENT"))
+	header, err := signer.Presign(req, nil, "s3", "eu-west-1", 15*time.Minute, time.Now())
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "Presign Parse URL Error")
 	}
-	postUrl, err := url.Parse(postUrlString)
-	if err != nil {
-		return nil, err
+	req.Header = header
+
+	return req.URL, nil
+}
+
+const ErrorPostItAWS = "ErrorPostItAWS"
+
+func (ps *S3Manager) PostIt(bucket string, assetId uuid.UUID) (*url.URL, error) {
+	// Create signed url
+	putObjectInput := &s3.PutObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String("pending/" + assetId.String()),
 	}
 
-	log.Println("The URL is:", postUrl.String(), " err:", err)
+	req, _ := ps.svc.PutObjectRequest(putObjectInput)
+	postUrlString, err := req.Presign(15 * time.Minute)
+	if err != nil {
+		return nil, auerrors.NewWithError(ErrorPostItAWS, err)
+	}
+
+	postUrl, err := url.Parse(postUrlString)
+	if err != nil {
+		return nil, auerrors.NewWithError(ErrorPostItAWS, err)
+	}
 	return postUrl, nil
+}
+
+const ErrorUpdateItAWS = "ErrorUpdateItAWS"
+const ErrorAlreadyUploaded = "ErrorAlreadyUploaded"
+
+func (ps *S3Manager) UpdateIt(bucket string, assetId uuid.UUID) error {
+	key := assetId.String()
+	uploadedKey := "/uploaded/" + key
+	pendingKey := "/pending/" + key
+
+	pendingHead, err := ps.head(bucket, pendingKey)
+	if err != nil {
+		return err
+	}
+
+	uploadedHead, err := ps.head(bucket, uploadedKey)
+	if err != nil {
+		code := errors.Cause(err).Error()
+		if code != ErrorNotFound {
+			return err
+		}
+	}
+	if uploadedHead != nil {
+		return auerrors.New(ErrorAlreadyUploaded, fmt.Sprintf("Asset %s is already uploaded", assetId))
+	}
+
+	_, err = ps.svc.CopyObject(
+		&s3.CopyObjectInput{
+			Bucket:            aws.String(bucket),
+			Key:               aws.String(uploadedKey),
+			CopySource:        aws.String(bucket + pendingKey),
+			CopySourceIfMatch: pendingHead.ETag,
+		},
+	)
+	if err != nil {
+		return auerrors.NewWithError(ErrorUpdateItAWS, err)
+	}
+
+	return nil
+}
+
+const ErrorHeadAWS = "ErrorHeadAWS"
+const ErrorNotFound = "ErrorNotFound"
+
+func (ps *S3Manager) head(bucket string, key string) (*s3.HeadObjectOutput, error) {
+	//Check if it exist
+	head, err := ps.svc.HeadObject(
+		&s3.HeadObjectInput{
+			Bucket: aws.String(bucket),
+			Key:    aws.String(key),
+		},
+	)
+	if err != nil {
+		if awsErr, ok := err.(awserr.RequestFailure); ok {
+			switch code := awsErr.StatusCode(); code {
+			case 404:
+				return nil, auerrors.New(ErrorNotFound, fmt.Sprintf("Asset %s is not found", key))
+			default:
+				return nil, auerrors.NewWithError(ErrorHeadAWS, err)
+			}
+		}
+		return nil, auerrors.NewWithError(ErrorHeadAWS, err)
+	}
+
+	return head, nil
 }
