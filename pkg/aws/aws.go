@@ -37,8 +37,8 @@ func NewAwsSession(region string, cred *credentials.Credentials) (*session.Sessi
 }
 
 func NewS3Manager(sess *session.Session) (*S3Manager, error) {
-	s3 := s3.New(sess)
-	return &S3Manager{s3}, nil
+	scv := s3.New(sess)
+	return &S3Manager{scv}, nil
 }
 
 type S3Manager struct {
@@ -58,24 +58,23 @@ func (ps *S3Manager) PostItA(bucket string, assetId uuid.UUID) (*url.URL, error)
 	return req.URL, nil
 }
 
-const ErrorPostItAWS = "ErrorPostItAWS"
+const ErrorPostURLAWS = "ErrorPostURLAWS"
 
-func (ps *S3Manager) PostIt(bucket string, assetId uuid.UUID) (*url.URL, error) {
+func (ps *S3Manager) PutURL(bucket string, assetId uuid.UUID) (*url.URL, error) {
 	// Create signed url
 	putObjectInput := &s3.PutObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String("pending/" + assetId.String()),
 	}
-
 	req, _ := ps.svc.PutObjectRequest(putObjectInput)
 	postUrlString, err := req.Presign(15 * time.Minute)
 	if err != nil {
-		return nil, auerrors.NewWithError(ErrorPostItAWS, err)
+		return nil, auerrors.NewWithError(ErrorPostURLAWS, err)
 	}
 
 	postUrl, err := url.Parse(postUrlString)
 	if err != nil {
-		return nil, auerrors.NewWithError(ErrorPostItAWS, err)
+		return nil, auerrors.NewWithError(ErrorPostURLAWS, err)
 	}
 	return postUrl, nil
 }
@@ -88,11 +87,6 @@ func (ps *S3Manager) UpdateIt(bucket string, assetId uuid.UUID) error {
 	uploadedKey := "/uploaded/" + key
 	pendingKey := "/pending/" + key
 
-	pendingHead, err := ps.head(bucket, pendingKey)
-	if err != nil {
-		return err
-	}
-
 	uploadedHead, err := ps.head(bucket, uploadedKey)
 	if err != nil {
 		code := errors.Cause(err).Error()
@@ -100,10 +94,15 @@ func (ps *S3Manager) UpdateIt(bucket string, assetId uuid.UUID) error {
 			return err
 		}
 	}
+
 	if uploadedHead != nil {
 		return auerrors.New(ErrorAlreadyUploaded, fmt.Sprintf("Asset %s is already uploaded", assetId))
 	}
 
+	pendingHead, err := ps.head(bucket, pendingKey)
+	if err != nil {
+		return err
+	}
 	_, err = ps.svc.CopyObject(
 		&s3.CopyObjectInput{
 			Bucket:            aws.String(bucket),
@@ -117,6 +116,31 @@ func (ps *S3Manager) UpdateIt(bucket string, assetId uuid.UUID) error {
 	}
 
 	return nil
+}
+
+const ErrorGetURLAWS = "ErrorGetURLAWS"
+
+func (ps *S3Manager) GetURL(bucket string, assetId uuid.UUID, timeout int) (*url.URL, error) {
+	key := assetId.String()
+	uploadedKey := "/uploaded/" + key
+
+	req, _ := ps.svc.GetObjectRequest(
+		&s3.GetObjectInput{
+			Bucket: aws.String(bucket),
+			Key:    aws.String(uploadedKey),
+		})
+
+	getUrlString, err := req.Presign(time.Duration(timeout) * time.Second)
+	if err != nil {
+		return nil, auerrors.NewWithError(ErrorGetURLAWS, err)
+	}
+
+	getUrl, err := url.Parse(getUrlString)
+	if err != nil {
+		return nil, auerrors.NewWithError(ErrorGetURLAWS, err)
+	}
+	return getUrl, nil
+
 }
 
 const ErrorHeadAWS = "ErrorHeadAWS"

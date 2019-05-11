@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/tgracchus/assertuploader/pkg/aws"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"strings"
@@ -32,7 +33,7 @@ func TestPoster(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	putUrl, err := poster.PostIt(testBucket, assetId)
+	putUrl, err := poster.PutURL(testBucket, assetId)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,7 +55,7 @@ func TestUpdateIt(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	putUrl, err := poster.PostIt(testBucket, assetId)
+	putUrl, err := poster.PutURL(testBucket, assetId)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +97,7 @@ func TestDoubleWrite(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	putUrl, err := poster.PostIt(testBucket, assetId)
+	putUrl, err := poster.PutURL(testBucket, assetId)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,10 +135,43 @@ func TestDoubleWrite(t *testing.T) {
 	if response.StatusCode != 200 {
 		t.Fatalf("Error put with code %d", response.StatusCode)
 	}
+
 	err = poster.UpdateIt(testBucket, assetId)
 	if err == nil {
 		t.Fatal(errors.New("Second update must fail"))
 	}
+
+	getUrl, err := poster.GetURL(testBucket, assetId, 15)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req, err = http.NewRequest("GET", getUrl.String(), nil)
+	if err != nil {
+		fmt.Println("error creating request", putUrl.String())
+		return
+	}
+	response, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response.StatusCode != 200 {
+		t.Fatalf("Error put with code %d", response.StatusCode)
+	}
+
+	bodyBytes, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	body := string(bodyBytes)
+
+	if body != "CONTENT" {
+		t.Fatalf("Body should be CONTENT, not %s", body)
+	}
+
+	log.Println("The URL is:", getUrl.String(), " err:", err)
+
 }
 
 func TestUpdateItFileDoesNotExist(t *testing.T) {
@@ -175,7 +209,7 @@ func TestPosterUrl(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	putUrl, err := poster.PostIt(testBucket, assetId)
+	putUrl, err := poster.PutURL(testBucket, assetId)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -228,7 +262,7 @@ func TestPosterEmptyArgs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = poster.PostIt("", assetId)
+	_, err = poster.PutURL("", assetId)
 	if err != nil {
 		if awsErr, ok := err.(awserr.Error); ok {
 			switch code := awsErr.Code(); code {
