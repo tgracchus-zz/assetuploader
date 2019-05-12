@@ -39,6 +39,10 @@ func NewS3Manager(sess *session.Session, scheduler scheduler.SimpleScheduler, si
 	return &S3Manager{svc: svc, signedPutExpiration: signedPutExpiration, scheduler: scheduler}, nil
 }
 
+const metadataPath = "metadata/"
+const status = "status"
+const uploaded = "uploaded"
+
 type S3Manager struct {
 	svc                 *s3.S3
 	signedPutExpiration time.Duration
@@ -84,7 +88,7 @@ func (ps *S3Manager) PutURL(bucket string, assetId uuid.UUID) (*url.URL, error) 
 	// Create signed url timeout mark
 	_, err = ps.svc.PutObject(&s3.PutObjectInput{
 		Bucket:  aws.String(bucket),
-		Key:     aws.String("metadata/" + assetId.String()),
+		Key:     aws.String(metadataPath + assetId.String()),
 		Tagging: aws.String(tags.Encode()),
 	})
 	if err != nil {
@@ -101,8 +105,8 @@ func (ps *S3Manager) Uploaded(bucket string, assetId uuid.UUID) error {
 	if err != nil {
 		return err
 	}
-	if tag, ok := tags["status"]; ok {
-		if *tag.Value == "uploaded" {
+	if tag, ok := tags[status]; ok {
+		if *tag.Value == uploaded {
 			return auerrors.FError(ErrorAlreadyUploaded, "Asset %s already uploaded", key)
 		}
 	}
@@ -137,13 +141,13 @@ func (ps *S3Manager) newUploadedFunction(bucket string, assetId uuid.UUID) sched
 	return func() error {
 		tags := &s3.Tagging{
 			TagSet: []*s3.Tag{
-				{Key: aws.String("Status"), Value: aws.String("uploaded")},
+				{Key: aws.String(status), Value: aws.String(uploaded)},
 			},
 		}
 		_, err := ps.svc.PutObjectTagging(
 			&s3.PutObjectTaggingInput{
 				Bucket:  aws.String(bucket),
-				Key:     aws.String("metadata/" + assetId.String()),
+				Key:     aws.String(metadataPath + assetId.String()),
 				Tagging: tags,
 			},
 		)
@@ -164,13 +168,14 @@ func (ps *S3Manager) newUploadedFunction(bucket string, assetId uuid.UUID) sched
 }
 
 func (ps *S3Manager) GetURL(bucket string, assetId uuid.UUID, timeout int) (*url.URL, error) {
-	metadataKey := "/metadata/" + assetId.String()
+
+	metadataKey := metadataPath + assetId.String()
 	tags, err := ps.tags(bucket, metadataKey)
 	if err != nil {
 		return nil, err
 	}
-	if tag, ok := tags["Status"]; ok {
-		if *tag.Value != "uploaded" {
+	if tag, ok := tags[status]; ok {
+		if *tag.Value != uploaded {
 			return nil, auerrors.FError(auerrors.ErrorNotFound, "Asset %s not marked as uploaded", assetId.String())
 		}
 	} else {
