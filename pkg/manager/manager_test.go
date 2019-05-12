@@ -90,14 +90,16 @@ func TestDoubleWrite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	signedPutExpiration := 2 * time.Second
 	poster, err := manager.NewS3Manager(session,
 		scheduler.NewSimpleScheduler(
 			scheduler.NewMemoryJobStore(func(date time.Time) time.Time {
-				return date.Truncate(time.Second);
+				return date.Truncate(time.Second)
 			}),
-			1*time.Second,
+			signedPutExpiration/2,
 		),
-		2*time.Second,
+		signedPutExpiration,
 	)
 	if err != nil {
 		t.Fatal(err)

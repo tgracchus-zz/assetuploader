@@ -34,15 +34,15 @@ func NewAwsSession(region string, cred *credentials.Credentials) (*session.Sessi
 		})), nil
 }
 
-func NewS3Manager(sess *session.Session, scheduler scheduler.SimpleScheduler, signedPutTimeOut time.Duration) (*S3Manager, error) {
+func NewS3Manager(sess *session.Session, scheduler scheduler.SimpleScheduler, signedPutExpiration time.Duration) (*S3Manager, error) {
 	svc := s3.New(sess)
-	return &S3Manager{svc: svc, signedPutTimeOut: signedPutTimeOut, scheduler: scheduler}, nil
+	return &S3Manager{svc: svc, signedPutExpiration: signedPutExpiration, scheduler: scheduler}, nil
 }
 
 type S3Manager struct {
-	svc              *s3.S3
-	signedPutTimeOut time.Duration
-	scheduler        scheduler.SimpleScheduler
+	svc                 *s3.S3
+	signedPutExpiration time.Duration
+	scheduler           scheduler.SimpleScheduler
 }
 
 /*
@@ -67,7 +67,7 @@ func (ps *S3Manager) PutURL(bucket string, assetId uuid.UUID) (*url.URL, error) 
 		Key:    aws.String(assetId.String()),
 	})
 
-	postUrlString, err := signReq.Presign(ps.signedPutTimeOut)
+	postUrlString, err := signReq.Presign(ps.signedPutExpiration)
 	if err != nil {
 		return nil, auerrors.CError(auerrors.ErrorInternalError, err)
 	}
@@ -124,12 +124,7 @@ func (ps *S3Manager) scheduleJob(bucket string, assetId uuid.UUID, tags map[stri
 	if err != nil {
 		return auerrors.CError(auerrors.ErrorInternalError, err)
 	}
-	dateSS := date.String()
-	print(dateSS)
-
-	expirationDate := date.Add(time.Duration(expire) * time.Second)
-	expirationDateS := expirationDate.String()
-	print(expirationDateS)
+	expirationDate := date.Add((time.Duration(expire) * 2) * time.Second)
 	job := scheduler.NewFixedDateJob(assetId, ps.newUploadedFunction(bucket, assetId), expirationDate)
 	err = ps.scheduler.Schedule(job)
 	if err != nil {
