@@ -78,7 +78,7 @@ func TestUpdateIt(t *testing.T) {
 		t.Fatalf("Error put with code %d", response.StatusCode)
 	}
 
-	err = poster.UpdateIt(testBucket, assetId)
+	err = poster.Uploaded(testBucket, assetId)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +90,15 @@ func TestDoubleWrite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	poster, err := manager.NewS3Manager(session, scheduler.NewImmediateScheduler(), 2*time.Minute)
+	poster, err := manager.NewS3Manager(session,
+		scheduler.NewSimpleScheduler(
+			scheduler.NewMemoryJobStore(func(date time.Time) time.Time {
+				return date.Truncate(time.Second);
+			}),
+			1*time.Second,
+		),
+		2*time.Second,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,31 +127,12 @@ func TestDoubleWrite(t *testing.T) {
 		t.Fatalf("Error put with code %d", response.StatusCode)
 	}
 
-	err = poster.UpdateIt(testBucket, assetId)
+	err = poster.Uploaded(testBucket, assetId)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	req, err = http.NewRequest("PUT", putUrl.String(), strings.NewReader("CONTENT2"))
-	if err != nil {
-		fmt.Println("error creating request", putUrl.String())
-		return
-	}
-	req.Header.Set("Content-Type", "text/plain")
-	response, err = http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if response.StatusCode != 200 {
-		t.Fatalf("Error put with code %d", response.StatusCode)
-	}
-
-	time.Sleep(6 * time.Second)
-	err = poster.UpdateIt(testBucket, assetId)
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	time.Sleep(5 * time.Second)
 	getUrl, err := poster.GetURL(testBucket, assetId, 15)
 	if err != nil {
 		t.Fatal(err)
@@ -191,7 +180,7 @@ func TestUpdateItFileDoesNotExist(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = poster.UpdateIt(testBucket, assetId)
+	err = poster.Uploaded(testBucket, assetId)
 	if err != nil {
 		t.Fatal(err)
 	}

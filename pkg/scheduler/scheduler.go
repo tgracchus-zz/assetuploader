@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"github.com/tgracchus/assertuploader/pkg/auerrors"
+	"log"
 	"time"
 )
 
@@ -23,14 +24,14 @@ func (s *immediateScheduler) Schedule(job *Job) error {
 	return job.jobFunction()
 }
 
-func NewSimpleScheduler(Store Store) SimpleScheduler {
+func NewSimpleScheduler(Store JobStore, checkTime time.Duration) SimpleScheduler {
 	scheduler := &simpleScheduler{store: Store}
-	scheduler.start()
+	scheduler.start(checkTime)
 	return scheduler
 }
 
 type simpleScheduler struct {
-	store Store
+	store JobStore
 }
 
 func (s *simpleScheduler) Schedule(job *Job) error {
@@ -41,7 +42,22 @@ func (s *simpleScheduler) Schedule(job *Job) error {
 	return nil
 }
 
-func (s *simpleScheduler) start(){
+func (s *simpleScheduler) start(checkTime time.Duration) {
+	ticker := time.NewTicker(checkTime)
+	go func() {
+		for range ticker.C {
+			jobs, err := s.store.GetBefore(time.Now())
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			for _, job := range jobs {
+				err = job.jobFunction()
+				if err != nil {
+					log.Fatal(err)
+				}
+			}
+		}
+	}()
 
 }
-

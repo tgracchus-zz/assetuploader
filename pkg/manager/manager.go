@@ -1,7 +1,6 @@
 package manager
 
 import (
-	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -95,7 +94,7 @@ func (ps *S3Manager) PutURL(bucket string, assetId uuid.UUID) (*url.URL, error) 
 	return postUrl, nil
 }
 
-func (ps *S3Manager) UpdateIt(bucket string, assetId uuid.UUID) error {
+func (ps *S3Manager) Uploaded(bucket string, assetId uuid.UUID) error {
 	key := assetId.String()
 	metadataKey := "/metadata/" + key
 	tags, err := ps.tags(bucket, metadataKey)
@@ -104,7 +103,7 @@ func (ps *S3Manager) UpdateIt(bucket string, assetId uuid.UUID) error {
 	}
 	if tag, ok := tags["status"]; ok {
 		if *tag.Value == "uploaded" {
-			return auerrors.SError(ErrorAlreadyUploaded, fmt.Sprintf("Asset %s already uploaded", key))
+			return auerrors.FError(ErrorAlreadyUploaded, "Asset %s already uploaded", key)
 		}
 	}
 	err = ps.scheduleJob(bucket, assetId, tags)
@@ -125,8 +124,12 @@ func (ps *S3Manager) scheduleJob(bucket string, assetId uuid.UUID, tags map[stri
 	if err != nil {
 		return auerrors.CError(auerrors.ErrorInternalError, err)
 	}
+	dateSS := date.String()
+	print(dateSS)
 
-	expirationDate := date.Add(time.Duration(expire) * time.Second).Add(ps.signedPutTimeOut / 10)
+	expirationDate := date.Add(time.Duration(expire) * time.Second)
+	expirationDateS := expirationDate.String()
+	print(expirationDateS)
 	job := scheduler.NewFixedDateJob(assetId, ps.newUploadedFunction(bucket, assetId), expirationDate)
 	err = ps.scheduler.Schedule(job)
 	if err != nil {
@@ -145,7 +148,7 @@ func (ps *S3Manager) newUploadedFunction(bucket string, assetId uuid.UUID) sched
 		_, err := ps.svc.PutObjectTagging(
 			&s3.PutObjectTaggingInput{
 				Bucket:  aws.String(bucket),
-				Key:     aws.String(assetId.String()),
+				Key:     aws.String("metadata/" + assetId.String()),
 				Tagging: tags,
 			},
 		)
@@ -166,6 +169,20 @@ func (ps *S3Manager) newUploadedFunction(bucket string, assetId uuid.UUID) sched
 }
 
 func (ps *S3Manager) GetURL(bucket string, assetId uuid.UUID, timeout int) (*url.URL, error) {
+	metadataKey := "/metadata/" + assetId.String()
+	tags, err := ps.tags(bucket, metadataKey)
+	if err != nil {
+		return nil, err
+	}
+	if tag, ok := tags["Status"]; ok {
+		if *tag.Value != "uploaded" {
+			return nil, auerrors.FError(auerrors.ErrorNotFound, "Asset %s not marked as uploaded", assetId.String())
+		}
+	} else {
+		return nil, auerrors.FError(auerrors.ErrorNotFound, "Asset %s not marked as uploaded", assetId.String())
+
+	}
+
 	req, _ := ps.svc.GetObjectRequest(
 		&s3.GetObjectInput{
 			Bucket: aws.String(bucket),
