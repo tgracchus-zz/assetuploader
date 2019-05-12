@@ -100,7 +100,7 @@ func (ps *S3Manager) PutURL(bucket string, assetId uuid.UUID) (*url.URL, error) 
 
 func (ps *S3Manager) Uploaded(bucket string, assetId uuid.UUID) error {
 	key := assetId.String()
-	metadataKey := "/metadata/" + key
+	metadataKey := metadataPath + key
 	tags, err := ps.tags(bucket, metadataKey)
 	if err != nil {
 		return err
