@@ -8,17 +8,13 @@ import (
 	"github.com/tgracchus/assertuploader/pkg/scheduler"
 )
 
-func BucketKeyToSeconds(date time.Time) time.Time {
-	return date.Truncate(time.Millisecond)
-}
-
 func TestAddAndGetJob(t *testing.T) {
-	jobStore := scheduler.NewMemoryJobStore(BucketKeyToSeconds)
+	jobStore := scheduler.NewMemoryJobStore(scheduler.MillisBucketKey)
 	testJobFunction := func() error {
 		return nil
 	}
 	executionDate := time.Now()
-	expectedJob := scheduler.NewFixedDateJob(uuid.New(), testJobFunction, executionDate)
+	expectedJob := scheduler.NewFixedDateJob(uuid.New().String(), testJobFunction, executionDate)
 	err := jobStore.UpSert(*expectedJob)
 	if err != nil {
 		t.Fatal(err)
@@ -36,12 +32,12 @@ func TestAddAndGetJob(t *testing.T) {
 }
 
 func TestUpdateJobStatus(t *testing.T) {
-	jobStore := scheduler.NewMemoryJobStore(BucketKeyToSeconds)
+	jobStore := scheduler.NewMemoryJobStore(scheduler.MillisBucketKey)
 	testJobFunction := func() error {
 		return nil
 	}
 	executionDate := time.Now()
-	newJob := scheduler.NewFixedDateJob(uuid.New(), testJobFunction, executionDate)
+	newJob := scheduler.NewFixedDateJob(uuid.New().String(), testJobFunction, executionDate)
 	err := jobStore.UpSert(*newJob)
 	if err != nil {
 		t.Fatal(err)
@@ -93,25 +89,23 @@ func TestUpdateJobStatus(t *testing.T) {
 	}
 }
 
-func TestAddJobBackInTime(t *testing.T) {
-	jobStore := scheduler.NewMemoryJobStore(BucketKeyToSeconds)
+func TestAddJobPastInTime(t *testing.T) {
+	jobStore := scheduler.NewMemoryJobStore(scheduler.MillisBucketKey)
 	testJobFunction := func() error {
 		return nil
 	}
 	now := time.Now()
 	pastExecutionDate := now.Add(-1 * time.Hour)
-	pastJob := scheduler.NewFixedDateJob(uuid.New(), testJobFunction, pastExecutionDate)
+	pastJob := scheduler.NewFixedDateJob(uuid.New().String(), testJobFunction, pastExecutionDate)
 	err := jobStore.UpSert(*pastJob)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	newJob := scheduler.NewFixedDateJob(uuid.New(), testJobFunction, now)
+	newJob := scheduler.NewFixedDateJob(uuid.New().String(), testJobFunction, now)
 	err = jobStore.UpSert(*newJob)
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	foundJobs, err := jobStore.GetBefore(now, []scheduler.JobStatus{newJob.Status})
 	if err != nil {
 		t.Fatal(err)
@@ -119,7 +113,6 @@ func TestAddJobBackInTime(t *testing.T) {
 	if len(foundJobs) != 2 {
 		t.Fatal("Expected at least two jobs")
 	}
-
 	foundJob := foundJobs[0]
 	if newJob.ID != foundJob.ID {
 		t.Fatal("Expected job and actual job do not match")

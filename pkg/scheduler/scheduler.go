@@ -4,24 +4,24 @@ import (
 	"log"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/tgracchus/assertuploader/pkg/auerrors"
 )
 
 type JobStatus string
 
-func NewFixedDateJob(id uuid.UUID, jobFunction JobFunction, executionDate time.Time) *Job {
+func NewFixedDateJob(id string, jobFunction JobFunction, executionDate time.Time) *Job {
 	return &Job{ID: id, JobFunction: jobFunction, Status: newJobStatus, ExecutionDate: executionDate}
 }
 
 type Job struct {
-	ID            uuid.UUID
-	JobFunction   JobFunction
-	Status        JobStatus
-	ExecutionDate time.Time
+	ID            string      `json:"id"`
+	JobFunction   JobFunction `json:"-"`
+	Status        JobStatus   `json:"status"`
+	ExecutionDate time.Time   `json:"date"`
 }
 
 const newJobStatus JobStatus = "new"
+const errorJobStatus JobStatus = "error"
 const executingJobStatus JobStatus = "executing"
 const doneJobStatus JobStatus = "done"
 
@@ -76,7 +76,7 @@ func (s *immediateScheduler) Schedule(job Job) error {
 
 func NewSimpleScheduler(Store JobStore, checkTime time.Duration) SimpleScheduler {
 	scheduler := &simpleScheduler{store: Store}
-	scheduler.start(checkTime)
+	scheduler.tick(checkTime)
 	return scheduler
 }
 
@@ -92,7 +92,7 @@ func (s *simpleScheduler) Schedule(job Job) error {
 	return nil
 }
 
-func (s *simpleScheduler) start(checkTime time.Duration) {
+func (s *simpleScheduler) tick(checkTime time.Duration) {
 	ticker := time.NewTicker(checkTime)
 	go func() {
 		for range ticker.C {

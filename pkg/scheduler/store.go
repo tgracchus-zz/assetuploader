@@ -1,9 +1,8 @@
 package scheduler
 
 import (
+	"encoding/json"
 	"time"
-
-	"github.com/google/uuid"
 )
 
 type JobStore interface {
@@ -47,6 +46,7 @@ type getBefore struct {
 
 func memoryJobStoreMonitor(bucketKeyFunc BucketKeyFunc, upSert chan Job, query chan getBefore, out chan []Job) {
 	jobs := newTimeBuckets(bucketKeyFunc)
+
 	go func() {
 		for {
 			select {
@@ -54,11 +54,19 @@ func memoryJobStoreMonitor(bucketKeyFunc BucketKeyFunc, upSert chan Job, query c
 				if !ok {
 					upSert = nil
 				}
-				jobs.add(job)
+				jobs.upsert(job)
 			case get, ok := <-query:
 				if !ok {
 					query = nil
 				}
+
+				res, err := json.Marshal(jobs.Buckets)
+				if err != nil {
+					println(err.Error())
+					break
+				}
+				resS := string(res)
+				println(resS)
 				out <- jobs.getBefore(get)
 			}
 
@@ -69,26 +77,26 @@ func memoryJobStoreMonitor(bucketKeyFunc BucketKeyFunc, upSert chan Job, query c
 	}()
 }
 
-type BucketKeyFunc func(date time.Time) time.Time
+type BucketKeyFunc func(date time.Time) string
 
 func newTimeBuckets(bucketKeyFunc BucketKeyFunc) *jobs {
 	now := bucketKeyFunc(time.Now())
 	bucket := newTimeBucket(now, nil)
-	buckets := make(map[time.Time]*timeBucket)
+	buckets := make(map[string]timeBucket)
 	buckets[now] = bucket
-	return &jobs{buckets, bucket, bucketKeyFunc}
+	return &jobs{buckets, &bucket, bucketKeyFunc}
 }
 
 type jobs struct {
-	buckets       map[time.Time]*timeBucket
+	Buckets       map[string]timeBucket `json:"buckets"`
 	headBucket    *timeBucket
 	bucketKeyFunc BucketKeyFunc
 }
 
-func (j *jobs) add(job Job) {
+func (j *jobs) upsert(job Job) {
 	now := j.bucketKeyFunc(job.ExecutionDate)
 	bucket := j.findOrCreateBucket(now)
-	bucket.jobs[job.ID] = &job
+	bucket.Jobs[job.ID] = job
 }
 
 func (j *jobs) getBefore(before getBefore) []Job {
@@ -100,10 +108,10 @@ func (j *jobs) findBucketsBefore(before getBefore) []Job {
 	bucket := j.headBucket
 	jobs := make([]Job, 0, 0)
 	for bucket != nil {
-		if bucket.bucketKey.Before(buketKey) || bucket.bucketKey.Equal(buketKey) {
-			for _, job := range bucket.jobs {
+		if bucket.bucketKey <= buketKey {
+			for _, job := range bucket.Jobs {
 				if ok := before.status[job.Status]; ok {
-					jobs = append(jobs, *job)
+					jobs = append(jobs, job)
 				}
 			}
 		}
@@ -112,23 +120,23 @@ func (j *jobs) findBucketsBefore(before getBefore) []Job {
 	return jobs
 }
 
-func (j *jobs) findOrCreateBucket(bucketKey time.Time) *timeBucket {
+func (j *jobs) findOrCreateBucket(bucketKey string) *timeBucket {
 	bucket := j.headBucket
 	var lastBucket *timeBucket
 	for bucket != nil {
 		//Bucket has the same key than current bucket, just return it
-		if bucket.bucketKey.Equal(bucketKey) {
+		if bucket.bucketKey == bucketKey {
 			return bucket
 		}
 		//Bucket is newer than the current bucket, create it
-		if bucketKey.After(bucket.bucketKey) {
+		if bucketKey > bucket.bucketKey {
 			newBucket := newTimeBucket(bucketKey, bucket)
 			newBucket.previous = bucket
 			//if previous bucket is nil it means we need to change the headBucket
 			if lastBucket == nil {
-				j.headBucket = newBucket
+				j.headBucket = &newBucket
 			}
-			return newBucket
+			return &newBucket
 		}
 
 		// Just iterate through the list
@@ -138,20 +146,32 @@ func (j *jobs) findOrCreateBucket(bucketKey time.Time) *timeBucket {
 
 	// If we reach this, it means the bucketKey is before our last Registered bucketKey
 	newBucket := newTimeBucket(bucketKey, nil)
-	lastBucket.previous = newBucket
-	return newBucket
+	lastBucket.previous = &newBucket
+	return &newBucket
 }
 
 type timeBucket struct {
-	bucketKey time.Time
-	jobs      map[uuid.UUID]*Job
-	previous  *timeBucket
+	bucketKey string         `json:"-"`
+	Jobs      map[string]Job `json:"jobs"`
+	previous  *timeBucket    `json:"-"`
 }
 
-func newTimeBucket(bucket time.Time, previous *timeBucket) *timeBucket {
-	return &timeBucket{
-		jobs:      make(map[uuid.UUID]*Job),
+func newTimeBucket(bucket string, previous *timeBucket) timeBucket {
+	return timeBucket{
+		Jobs:      make(map[string]Job),
 		previous:  previous,
 		bucketKey: bucket,
 	}
+}
+
+func MillisBucketKey(date time.Time) string {
+	return date.Truncate(time.Millisecond).UTC().Format(time.RFC3339)
+}
+
+func SecondsBucketKeyTo(date time.Time) string {
+	return date.Truncate(time.Second).UTC().Format(time.RFC3339)
+}
+
+func MinutesBucketKeyTo(date time.Time) string {
+	return date.Truncate(time.Minute).UTC().Format(time.RFC3339)
 }
