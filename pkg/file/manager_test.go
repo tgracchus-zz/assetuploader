@@ -1,4 +1,4 @@
-package manager_test
+package file_test
 
 import (
 	"fmt"
@@ -7,7 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
-	"github.com/tgracchus/assertuploader/pkg/manager"
+	"github.com/tgracchus/assertuploader/pkg/file"
 	"github.com/tgracchus/assertuploader/pkg/scheduler"
 	"io/ioutil"
 	"log"
@@ -20,13 +20,13 @@ import (
 const testBucket = "assertuploader"
 const testRegion = "eu-west-1"
 
-func TestPoster(t *testing.T) {
+func TestPutUrl(t *testing.T) {
 	cred := credentials.NewEnvCredentials()
-	session, err := manager.NewAwsSession(testRegion, cred)
+	session, err := file.NewAwsSession(testRegion, cred)
 	if err != nil {
 		t.Fatal(err)
 	}
-	poster, err := manager.NewS3Manager(session, scheduler.NewImmediateScheduler(), 2*time.Minute)
+	manager, err := file.NewS3FileManager(session, scheduler.NewImmediateScheduler(), 2*time.Minute)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,7 +35,7 @@ func TestPoster(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	putUrl, err := poster.PutURL(testBucket, assetId)
+	putUrl, err := manager.PutURL(testBucket, assetId)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,11 +44,11 @@ func TestPoster(t *testing.T) {
 
 func TestUpdateIt(t *testing.T) {
 	cred := credentials.NewEnvCredentials()
-	session, err := manager.NewAwsSession(testRegion, cred)
+	session, err := file.NewAwsSession(testRegion, cred)
 	if err != nil {
 		t.Fatal(err)
 	}
-	poster, err := manager.NewS3Manager(session, scheduler.NewImmediateScheduler(), 2*time.Minute)
+	poster, err := file.NewS3FileManager(session, scheduler.NewImmediateScheduler(), 2*time.Minute)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,13 +86,13 @@ func TestUpdateIt(t *testing.T) {
 
 func TestDoubleWrite(t *testing.T) {
 	cred := credentials.NewEnvCredentials()
-	session, err := manager.NewAwsSession(testRegion, cred)
+	session, err := file.NewAwsSession(testRegion, cred)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	signedPutExpiration := 2 * time.Second
-	poster, err := manager.NewS3Manager(session,
+	poster, err := file.NewS3FileManager(session,
 		scheduler.NewSimpleScheduler(
 			scheduler.NewMemoryJobStore(func(date time.Time) time.Time {
 				return date.Truncate(time.Second)
@@ -170,11 +170,11 @@ func TestDoubleWrite(t *testing.T) {
 
 func TestUpdateItFileDoesNotExist(t *testing.T) {
 	cred := credentials.NewEnvCredentials()
-	session, err := manager.NewAwsSession(testRegion, cred)
+	session, err := file.NewAwsSession(testRegion, cred)
 	if err != nil {
 		t.Fatal(err)
 	}
-	poster, err := manager.NewS3Manager(session, scheduler.NewImmediateScheduler(), 2*time.Minute)
+	poster, err := file.NewS3FileManager(session, scheduler.NewImmediateScheduler(), 2*time.Minute)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -190,11 +190,11 @@ func TestUpdateItFileDoesNotExist(t *testing.T) {
 
 func TestPosterUrl(t *testing.T) {
 	cred := credentials.NewStaticCredentials("testCredentials", "testSecret", "testKey")
-	session, err := manager.NewAwsSession(testRegion, cred)
+	session, err := file.NewAwsSession(testRegion, cred)
 	if err != nil {
 		t.Fatal(err)
 	}
-	poster, err := manager.NewS3Manager(session, scheduler.NewImmediateScheduler(), 2*time.Minute)
+	poster, err := file.NewS3FileManager(session, scheduler.NewImmediateScheduler(), 2*time.Minute)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -223,19 +223,19 @@ func TestPosterUrl(t *testing.T) {
 
 func TestSessionEmptyCredentials(t *testing.T) {
 	cred := &credentials.Credentials{}
-	_, err := manager.NewAwsSession(testRegion, cred)
+	_, err := file.NewAwsSession(testRegion, cred)
 
 	switch code := errors.Cause(err).Error(); code {
-	case manager.ErrorEmptyAWSCredentials:
+	case file.ErrorEmptyAWSCredentials:
 	default:
 		t.Fatalf("We are expected an auerrors.AUError")
 	}
 }
 
 func TestSessionNilCredentials(t *testing.T) {
-	_, err := manager.NewAwsSession(testRegion, nil)
+	_, err := file.NewAwsSession(testRegion, nil)
 	switch code := errors.Cause(err).Error(); code {
-	case manager.ErrorNoAWSCredentials:
+	case file.ErrorNoAWSCredentials:
 	default:
 		t.Fatalf("We are expected an auerrors.AUError")
 	}
@@ -243,11 +243,11 @@ func TestSessionNilCredentials(t *testing.T) {
 
 func TestPosterEmptyArgs(t *testing.T) {
 	cred := credentials.NewStaticCredentials("testCredentials", "testSecret", "testKey")
-	session, err := manager.NewAwsSession(testRegion, cred)
+	session, err := file.NewAwsSession(testRegion, cred)
 	if err != nil {
 		t.Fatal(err)
 	}
-	poster, err := manager.NewS3Manager(session, scheduler.NewImmediateScheduler(), 2*time.Minute)
+	poster, err := file.NewS3FileManager(session, scheduler.NewImmediateScheduler(), 2*time.Minute)
 	if err != nil {
 		t.Fatal(err)
 	}

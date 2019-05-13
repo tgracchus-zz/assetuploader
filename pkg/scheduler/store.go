@@ -1,67 +1,77 @@
 package scheduler
 
 import (
-	"github.com/google/uuid"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type JobStore interface {
-	Add(job *Job) error
-	GetBefore(date time.Time) ([]Job, error)
+	UpSert(job Job) error
+	GetBefore(date time.Time, statuses []JobStatus) ([]Job, error)
 }
 
-func NewMemoryJobStore(bucketKeyFunc bucketKeyFunc) JobStore {
-	add := make(chan Job)
-	query := make(chan time.Time)
+func NewMemoryJobStore(bucketKeyFunc BucketKeyFunc) JobStore {
+	upSert := make(chan Job)
+	query := make(chan getBefore)
 	out := make(chan []Job)
-	store := &memoryJobStore{add: add, query: query, out: out}
-	memoryJobStoreMonitor(bucketKeyFunc,add, query, out)
+	store := &memoryJobStore{upSert: upSert, query: query, out: out}
+	memoryJobStoreMonitor(bucketKeyFunc, upSert, query, out)
 	return store
 }
 
 type memoryJobStore struct {
-	add   chan<- Job
-	query chan<- time.Time
-	out   <-chan []Job
+	upSert chan<- Job
+	query  chan<- getBefore
+	out    <-chan []Job
 }
 
-func (st *memoryJobStore) Add(job *Job) error {
-	st.add <- *job
+func (st *memoryJobStore) UpSert(job Job) error {
+	st.upSert <- job
 	return nil
 }
 
-func (st *memoryJobStore) GetBefore(date time.Time) ([]Job, error) {
-	st.query <- date
+func (st *memoryJobStore) GetBefore(date time.Time, statuses []JobStatus) ([]Job, error) {
+	statusesMap := make(map[JobStatus]bool)
+	for _, status := range statuses {
+		statusesMap[status] = true
+	}
+	st.query <- getBefore{date: date, status: statusesMap}
 	return <-st.out, nil
 }
 
-func memoryJobStoreMonitor(bucketKeyFunc bucketKeyFunc, add chan Job, query chan time.Time, out chan []Job) {
+type getBefore struct {
+	date   time.Time
+	status map[JobStatus]bool
+}
+
+func memoryJobStoreMonitor(bucketKeyFunc BucketKeyFunc, upSert chan Job, query chan getBefore, out chan []Job) {
 	jobs := newTimeBuckets(bucketKeyFunc)
 	go func() {
 		for {
 			select {
-			case job, ok := <-add:
+			case job, ok := <-upSert:
 				if !ok {
-					add = nil
+					upSert = nil
 				}
 				jobs.add(job)
-			case date, ok := <-query:
+			case get, ok := <-query:
 				if !ok {
 					query = nil
 				}
-				out <- jobs.getBefore(date)
+				out <- jobs.getBefore(get)
 			}
 
-			if add == nil && query == nil {
+			if upSert == nil && query == nil {
 				break
 			}
 		}
 	}()
 }
 
-type bucketKeyFunc func(date time.Time) time.Time
+type BucketKeyFunc func(date time.Time) time.Time
 
-func newTimeBuckets(bucketKeyFunc bucketKeyFunc) *jobs {
+func newTimeBuckets(bucketKeyFunc BucketKeyFunc) *jobs {
 	now := bucketKeyFunc(time.Now())
 	bucket := newTimeBucket(now, nil)
 	buckets := make(map[time.Time]*timeBucket)
@@ -72,39 +82,39 @@ func newTimeBuckets(bucketKeyFunc bucketKeyFunc) *jobs {
 type jobs struct {
 	buckets       map[time.Time]*timeBucket
 	headBucket    *timeBucket
-	bucketKeyFunc bucketKeyFunc
+	bucketKeyFunc BucketKeyFunc
 }
 
 func (j *jobs) add(job Job) {
-	now := j.bucketKeyFunc(job.executionDate)
+	now := j.bucketKeyFunc(job.ExecutionDate)
 	bucket := j.findOrCreateBucket(now)
-	bucket.jobs[job.id] = &job
+	bucket.jobs[job.ID] = &job
 }
 
-func (j *jobs) getBefore(date time.Time) []Job {
-	now := j.bucketKeyFunc(date)
-	return j.findBucketsBefore(now)
-
+func (j *jobs) getBefore(before getBefore) []Job {
+	return j.findBucketsBefore(before)
 }
 
-func (j *jobs) findBucketsBefore(bucketKey time.Time) []Job {
+func (j *jobs) findBucketsBefore(before getBefore) []Job {
+	buketKey := j.bucketKeyFunc(before.date)
 	bucket := j.headBucket
 	jobs := make([]Job, 0, 0)
 	for bucket != nil {
-		if bucket.bucketKey.Before(bucketKey) {
+		if bucket.bucketKey.Before(buketKey) || bucket.bucketKey.Equal(buketKey) {
 			for _, job := range bucket.jobs {
-				jobs = append(jobs, *job)
+				if ok := before.status[job.Status]; ok {
+					jobs = append(jobs, *job)
+				}
 			}
 		}
 		bucket = bucket.previous
 	}
-
 	return jobs
 }
 
 func (j *jobs) findOrCreateBucket(bucketKey time.Time) *timeBucket {
 	bucket := j.headBucket
-	var lastBucket *timeBucket = nil
+	var lastBucket *timeBucket
 	for bucket != nil {
 		//Bucket has the same key than current bucket, just return it
 		if bucket.bucketKey.Equal(bucketKey) {

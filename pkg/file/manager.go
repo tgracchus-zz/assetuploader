@@ -1,4 +1,4 @@
-package manager
+package file
 
 import (
 	"github.com/aws/aws-sdk-go/aws"
@@ -34,23 +34,23 @@ func NewAwsSession(region string, cred *credentials.Credentials) (*session.Sessi
 		})), nil
 }
 
-func NewS3Manager(sess *session.Session, scheduler scheduler.SimpleScheduler, signedPutExpiration time.Duration) (*S3Manager, error) {
+func NewS3FileManager(sess *session.Session, scheduler scheduler.SimpleScheduler, signedPutExpiration time.Duration) (*S3FileManager, error) {
 	svc := s3.New(sess)
-	return &S3Manager{svc: svc, signedPutExpiration: signedPutExpiration, scheduler: scheduler}, nil
+	return &S3FileManager{svc: svc, signedPutExpiration: signedPutExpiration, scheduler: scheduler}, nil
 }
 
 const metadataPath = "metadata/"
 const status = "status"
 const uploaded = "uploaded"
 
-type S3Manager struct {
+type S3FileManager struct {
 	svc                 *s3.S3
 	signedPutExpiration time.Duration
 	scheduler           scheduler.SimpleScheduler
 }
 
 /*
-func (ps *S3Manager) PostItA(bucket string, assetId uuid.UUID) (*url.URL, error) {
+func (ps *S3FileManager) PostItA(bucket string, assetId uuid.UUID) (*url.URL, error) {
 	// Create signed url
 	signer := v4.NewSigner(credentials.NewEnvCredentials())
 	req := httptest.NewRequest("PUT", "https://assertuploader.s3.eu-west-1.amazonaws.com/"+assetId.String(), strings.NewReader("CONTENT"))
@@ -64,7 +64,7 @@ func (ps *S3Manager) PostItA(bucket string, assetId uuid.UUID) (*url.URL, error)
 }
 */
 
-func (ps *S3Manager) PutURL(bucket string, assetId uuid.UUID) (*url.URL, error) {
+func (ps *S3FileManager) PutURL(bucket string, assetId uuid.UUID) (*url.URL, error) {
 	// Create signed url
 	signReq, _ := ps.svc.PutObjectRequest(&s3.PutObjectInput{
 		Bucket: aws.String(bucket),
@@ -98,7 +98,7 @@ func (ps *S3Manager) PutURL(bucket string, assetId uuid.UUID) (*url.URL, error) 
 	return postUrl, nil
 }
 
-func (ps *S3Manager) Uploaded(bucket string, assetId uuid.UUID) error {
+func (ps *S3FileManager) Uploaded(bucket string, assetId uuid.UUID) error {
 	key := assetId.String()
 	metadataKey := metadataPath + key
 	tags, err := ps.tags(bucket, metadataKey)
@@ -117,7 +117,7 @@ func (ps *S3Manager) Uploaded(bucket string, assetId uuid.UUID) error {
 	return nil
 }
 
-func (ps *S3Manager) scheduleJob(bucket string, assetId uuid.UUID, tags map[string]*s3.Tag) error {
+func (ps *S3FileManager) scheduleJob(bucket string, assetId uuid.UUID, tags map[string]*s3.Tag) error {
 	expireS := tags["X-Amz-Expires"]
 	expire, err := strconv.Atoi(*expireS.Value)
 	if err != nil {
@@ -137,7 +137,7 @@ func (ps *S3Manager) scheduleJob(bucket string, assetId uuid.UUID, tags map[stri
 	return nil
 }
 
-func (ps *S3Manager) newUploadedFunction(bucket string, assetId uuid.UUID) scheduler.JobFunction {
+func (ps *S3FileManager) newUploadedFunction(bucket string, assetId uuid.UUID) scheduler.JobFunction {
 	return func() error {
 		tags := &s3.Tagging{
 			TagSet: []*s3.Tag{
@@ -167,8 +167,7 @@ func (ps *S3Manager) newUploadedFunction(bucket string, assetId uuid.UUID) sched
 	}
 }
 
-func (ps *S3Manager) GetURL(bucket string, assetId uuid.UUID, timeout int) (*url.URL, error) {
-
+func (ps *S3FileManager) GetURL(bucket string, assetId uuid.UUID, timeout int) (*url.URL, error) {
 	metadataKey := metadataPath + assetId.String()
 	tags, err := ps.tags(bucket, metadataKey)
 	if err != nil {
@@ -202,7 +201,7 @@ func (ps *S3Manager) GetURL(bucket string, assetId uuid.UUID, timeout int) (*url
 
 }
 
-func (ps *S3Manager) tags(bucket string, key string) (map[string]*s3.Tag, error) {
+func (ps *S3FileManager) tags(bucket string, key string) (map[string]*s3.Tag, error) {
 	//Check if it exist
 	result, err := ps.svc.GetObjectTagging(
 		&s3.GetObjectTaggingInput{
