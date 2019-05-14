@@ -9,6 +9,7 @@ import (
 const ErrorInternalError = "ErrorInternalError"
 const ErrorNotFound = "ErrorNotFound"
 const ErrorConflict = "ErrorConflict"
+const ErrorBadInput = "ErrorBadInput"
 
 func SError(code string, msg string) error {
 	return errors.Wrap(errors.New(code), msg)

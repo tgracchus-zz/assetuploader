@@ -1,16 +1,16 @@
-package schedule
+package job
 
 import (
 	"time"
 )
 
-type JobStore interface {
+type Store interface {
 	UpSert(job Job) error
-	GetBefore(date time.Time, statuses []JobStatus) ([]Job, error)
+	GetBefore(date time.Time, statuses []Status) ([]Job, error)
 }
 
 // NewMemoryJobStore https://jepsen.io/consistency/models/pram
-func NewMemoryJobStore(bucketKeyFunc BucketKeyFunc) JobStore {
+func NewMemoryStore(bucketKeyFunc BucketKeyFunc) Store {
 	upSert := make(chan Job, 1000)
 	query := make(chan getBefore, 1000)
 	out := make(chan []Job, 1000)
@@ -30,8 +30,8 @@ func (st *memoryJobStore) UpSert(job Job) error {
 	return nil
 }
 
-func (st *memoryJobStore) GetBefore(date time.Time, statuses []JobStatus) ([]Job, error) {
-	statusesMap := make(map[JobStatus]bool)
+func (st *memoryJobStore) GetBefore(date time.Time, statuses []Status) ([]Job, error) {
+	statusesMap := make(map[Status]bool)
 	for _, status := range statuses {
 		statusesMap[status] = true
 	}
@@ -41,12 +41,11 @@ func (st *memoryJobStore) GetBefore(date time.Time, statuses []JobStatus) ([]Job
 
 type getBefore struct {
 	date   time.Time
-	status map[JobStatus]bool
+	status map[Status]bool
 }
 
 func memoryJobStoreMonitor(bucketKeyFunc BucketKeyFunc, upSert chan Job, query chan getBefore, out chan []Job) {
 	jobs := newTimeBuckets(bucketKeyFunc)
-
 	go func() {
 		for {
 			select {

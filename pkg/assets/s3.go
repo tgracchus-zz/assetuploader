@@ -15,28 +15,37 @@ import (
 	"github.com/tgracchus/assertuploader/pkg/schedule"
 )
 
-const ErrorEmptyAWSCredentials = "ErrorEmptyAWSCredentials"
-const ErrorNoAWSCredentials = "ErrorNoAWSCredentials"
-const ErrorAlreadyUploaded = "ErrorAlreadyUploaded"
-
 var emptyCredentials = credentials.Credentials{}
-
-func NewS3FileManager(sess *session.Session, scheduler schedule.SimpleScheduler, signedPutExpiration time.Duration) (*S3FileManager, error) {
-	svc := s3.New(sess)
-	return &S3FileManager{svc: svc, signedPutExpiration: signedPutExpiration, scheduler: scheduler}, nil
-}
 
 const metadataPath = "metadata/"
 const status = "status"
 const uploaded = "uploaded"
 
-type S3FileManager struct {
+type AssetManager interface {
+	PutURL(bucket string, assetID uuid.UUID) (*url.URL, error)
+	Uploaded(bucket string, assetID uuid.UUID) error
+	GetURL(bucket string, assetID uuid.UUID, timeout int64) (*url.URL, error)
+}
+
+func NewDefaultFileManager(sess *session.Session) AssetManager {
+	store := schedule.NewMemoryJobStore(schedule.MinutesBucketKeyTo)
+	expirationDuration := 30 * time.Second
+	scheduler := schedule.NewSimpleScheduler(store, expirationDuration*2)
+	return News3AssetManager(sess, scheduler, expirationDuration)
+}
+
+func News3AssetManager(sess *session.Session, scheduler schedule.SimpleScheduler, signedPutExpiration time.Duration) *s3AssetManager {
+	svc := s3.New(sess)
+	return &s3AssetManager{svc: svc, signedPutExpiration: signedPutExpiration, scheduler: scheduler}
+}
+
+type s3AssetManager struct {
 	svc                 *s3.S3
 	signedPutExpiration time.Duration
 	scheduler           schedule.SimpleScheduler
 }
 
-func (ps *S3FileManager) PutURL(bucket string, assetID uuid.UUID) (*url.URL, error) {
+func (ps *s3AssetManager) PutURL(bucket string, assetID uuid.UUID) (*url.URL, error) {
 	// Create signed url
 	signReq, _ := ps.svc.PutObjectRequest(&s3.PutObjectInput{
 		Bucket: aws.String(bucket),
@@ -70,7 +79,7 @@ func (ps *S3FileManager) PutURL(bucket string, assetID uuid.UUID) (*url.URL, err
 	return postURL, nil
 }
 
-func (ps *S3FileManager) Uploaded(bucket string, assetID uuid.UUID) error {
+func (ps *s3AssetManager) Uploaded(bucket string, assetID uuid.UUID) error {
 	key := assetID.String()
 	metadataKey := metadataPath + key
 	tags, err := ps.tags(bucket, metadataKey)
@@ -79,7 +88,7 @@ func (ps *S3FileManager) Uploaded(bucket string, assetID uuid.UUID) error {
 	}
 	if tag, ok := tags[status]; ok {
 		if *tag.Value == uploaded {
-			return auerr.FError(ErrorAlreadyUploaded, "Asset %s already uploaded", key)
+			return auerr.FError(auerr.ErrorConflict, "Asset %s already uploaded", key)
 		}
 	}
 	err = ps.scheduleJob(bucket, assetID, tags)
@@ -89,7 +98,7 @@ func (ps *S3FileManager) Uploaded(bucket string, assetID uuid.UUID) error {
 	return nil
 }
 
-func (ps *S3FileManager) scheduleJob(bucket string, assetID uuid.UUID, tags map[string]*s3.Tag) error {
+func (ps *s3AssetManager) scheduleJob(bucket string, assetID uuid.UUID, tags map[string]*s3.Tag) error {
 	expireS := tags["X-Amz-Expires"]
 	expire, err := strconv.Atoi(*expireS.Value)
 	if err != nil {
@@ -109,7 +118,7 @@ func (ps *S3FileManager) scheduleJob(bucket string, assetID uuid.UUID, tags map[
 	return nil
 }
 
-func (ps *S3FileManager) newUploadedFunction(bucket string, assetID uuid.UUID) schedule.JobFunction {
+func (ps *s3AssetManager) newUploadedFunction(bucket string, assetID uuid.UUID) schedule.JobFunction {
 	return func() error {
 		tags := &s3.Tagging{
 			TagSet: []*s3.Tag{
@@ -139,41 +148,40 @@ func (ps *S3FileManager) newUploadedFunction(bucket string, assetID uuid.UUID) s
 	}
 }
 
-func (ps *S3FileManager) GetURL(bucket string, assetId uuid.UUID, timeout int) (*url.URL, error) {
-	metadataKey := metadataPath + assetId.String()
+func (ps *s3AssetManager) GetURL(bucket string, assetID uuid.UUID, timeout int64) (*url.URL, error) {
+	metadataKey := metadataPath + assetID.String()
 	tags, err := ps.tags(bucket, metadataKey)
 	if err != nil {
 		return nil, err
 	}
 	if tag, ok := tags[status]; ok {
 		if *tag.Value != uploaded {
-			return nil, auerr.FError(auerr.ErrorNotFound, "Asset %s not marked as uploaded", assetId.String())
+			return nil, auerr.FError(auerr.ErrorNotFound, "Asset %s not marked as uploaded", assetID.String())
 		}
 	} else {
-		return nil, auerr.FError(auerr.ErrorNotFound, "Asset %s not marked as uploaded", assetId.String())
+		return nil, auerr.FError(auerr.ErrorNotFound, "Asset %s not marked as uploaded", assetID.String())
 
 	}
-
 	req, _ := ps.svc.GetObjectRequest(
 		&s3.GetObjectInput{
 			Bucket: aws.String(bucket),
-			Key:    aws.String(assetId.String()),
+			Key:    aws.String(assetID.String()),
 		})
 
-	getUrlString, err := req.Presign(time.Duration(timeout) * time.Second)
+	getURLString, err := req.Presign(time.Duration(timeout) * time.Second)
 	if err != nil {
 		return nil, auerr.CError(auerr.ErrorInternalError, err)
 	}
 
-	getUrl, err := url.Parse(getUrlString)
+	getURL, err := url.Parse(getURLString)
 	if err != nil {
 		return nil, auerr.CError(auerr.ErrorInternalError, err)
 	}
-	return getUrl, nil
+	return getURL, nil
 
 }
 
-func (ps *S3FileManager) tags(bucket string, key string) (map[string]*s3.Tag, error) {
+func (ps *s3AssetManager) tags(bucket string, key string) (map[string]*s3.Tag, error) {
 	//Check if it exist
 	result, err := ps.svc.GetObjectTagging(
 		&s3.GetObjectTaggingInput{

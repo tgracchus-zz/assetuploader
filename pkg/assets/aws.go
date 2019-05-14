@@ -9,10 +9,10 @@ import (
 
 func NewAwsSession(region string, cred *credentials.Credentials) (*session.Session, error) {
 	if cred == nil {
-		return nil, auerr.SError(ErrorNoAWSCredentials, "Credentials are nil")
+		return nil, auerr.SError(auerr.ErrorBadInput, "Credentials are nil")
 	}
 	if *cred == emptyCredentials {
-		return nil, auerr.SError(ErrorEmptyAWSCredentials, "Credentials are empty")
+		return nil, auerr.SError(auerr.ErrorBadInput, "Credentials are empty")
 	}
 	return session.Must(session.NewSession(
 		&aws.Config{

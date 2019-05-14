@@ -5,10 +5,11 @@ import (
 	"time"
 
 	"github.com/tgracchus/assertuploader/pkg/auerr"
+	"github.com/tgracchus/assertuploader/pkg/job"
 )
 
 type SimpleScheduler interface {
-	Schedule(job Job) error
+	Schedule(job job.Job) error
 }
 
 type immediateScheduler struct {
@@ -17,24 +18,24 @@ type immediateScheduler struct {
 func NewImmediateScheduler() SimpleScheduler {
 	return &immediateScheduler{}
 }
-func (s *immediateScheduler) Schedule(job Job) error {
+func (s *immediateScheduler) Schedule(job job.Job) error {
 	if time.Now().Before(job.ExecutionDate) {
 		return auerr.FError(auerr.ErrorConflict, "Executed before execution date %s", job.ExecutionDate.String())
 	}
 	return job.JobFunction()
 }
 
-func NewSimpleScheduler(Store JobStore, tickPeriod time.Duration) SimpleScheduler {
+func NewSimpleScheduler(Store job.Store, tickPeriod time.Duration) SimpleScheduler {
 	scheduler := &simpleScheduler{store: Store}
 	scheduler.tick(tickPeriod)
 	return scheduler
 }
 
 type simpleScheduler struct {
-	store JobStore
+	store job.Store
 }
 
-func (s *simpleScheduler) Schedule(job Job) error {
+func (s *simpleScheduler) Schedule(job job.Job) error {
 	return s.store.UpSert(job)
 }
 
@@ -42,7 +43,8 @@ func (s *simpleScheduler) tick(checkTime time.Duration) {
 	ticker := time.NewTicker(checkTime)
 	go func() {
 		for range ticker.C {
-			jobs, err := s.store.GetBefore(time.Now(), []JobStatus{newJobStatus})
+			//TODO: look also for executing overdued jobs
+			jobs, err := s.store.GetBefore(time.Now(), []job.Status{job.NewStatus})
 			if err != nil {
 				log.Println(err.Error())
 			}

@@ -6,15 +6,16 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/tgracchus/assertuploader/pkg/job"
 	"github.com/tgracchus/assertuploader/pkg/schedule"
 )
 
 func TestScheduleJob(t *testing.T) {
-	jobs := make(map[string]schedule.Job)
+	jobs := make(map[string]job.Job)
 	simpleScheduler := schedule.NewSimpleScheduler(NewMockJobStore(jobs), 200*time.Millisecond)
 	executionDate := time.Now()
 
-	job := schedule.NewFixedDateJob(uuid.New().String(), jobCallBack, executionDate)
+	job := job.NewFixedDateJob(uuid.New().String(), jobCallBack, executionDate)
 	simpleScheduler.Schedule(*job)
 	// Need to wait for the first tick at least
 	time.Sleep(500 * time.Millisecond)
@@ -29,11 +30,11 @@ func TestScheduleJob(t *testing.T) {
 }
 
 func TestScheduleJobFails(t *testing.T) {
-	jobs := make(map[string]schedule.Job)
+	jobs := make(map[string]job.Job)
 	simpleScheduler := schedule.NewSimpleScheduler(NewMockJobStore(jobs), 200*time.Millisecond)
 	executionDate := time.Now()
 
-	job := schedule.NewFixedDateJob(uuid.New().String(), errorCallBack, executionDate)
+	job := job.NewFixedDateJob(uuid.New().String(), errorCallBack, executionDate)
 	simpleScheduler.Schedule(*job)
 	// Need to wait for the first tick at least
 	time.Sleep(500 * time.Millisecond)
@@ -58,21 +59,21 @@ var errorCallBack = func() error {
 	return errors.New("errorCallBack")
 }
 
-func NewMockJobStore(jobs map[string]schedule.Job) schedule.JobStore {
+func NewMockJobStore(jobs map[string]job.Job) job.Store {
 	return &mockJobStore{jobs: jobs}
 }
 
 type mockJobStore struct {
-	jobs map[string]schedule.Job
+	jobs map[string]job.Job
 }
 
-func (ms *mockJobStore) UpSert(job schedule.Job) error {
+func (ms *mockJobStore) UpSert(job job.Job) error {
 	ms.jobs[job.ID] = job
 	return nil
 }
 
-func (ms *mockJobStore) GetBefore(date time.Time, statuses []schedule.JobStatus) ([]schedule.Job, error) {
-	jobsList := make([]schedule.Job, len(ms.jobs))
+func (ms *mockJobStore) GetBefore(date time.Time, statuses []job.Status) ([]job.Job, error) {
+	jobsList := make([]job.Job, len(ms.jobs))
 	i := 0
 	for _, v := range ms.jobs {
 		jobsList[i] = v
