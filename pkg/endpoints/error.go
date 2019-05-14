@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 )
 
+// AssetUploaderHTTPErrorHandler default error handler for asset uploader errors, maps them to httpcode.
 func AssetUploaderHTTPErrorHandler(err error, c echo.Context) {
 	if err, ok := err.(*echo.HTTPError); ok {
 		c.JSON(err.Code, err.Error())

@@ -4,12 +4,14 @@ import (
 	"time"
 )
 
+// Store is a time aware job store, it´s able to retrieve all the jobs with the given status
+// and meant to be executed a given date.
 type Store interface {
 	UpSert(job Job) error
 	GetBefore(date time.Time, statuses []Status) ([]Job, error)
 }
 
-// NewMemoryJobStore https://jepsen.io/consistency/models/pram
+// NewMemoryStore it´s an in memory Store
 func NewMemoryStore(bucketKeyFunc BucketKeyFunc) Store {
 	upSert := make(chan Job, 1000)
 	query := make(chan getBefore, 1000)
@@ -66,8 +68,6 @@ func memoryJobStoreMonitor(bucketKeyFunc BucketKeyFunc, upSert chan Job, query c
 		}
 	}()
 }
-
-type BucketKeyFunc func(date time.Time) string
 
 func newTimeBuckets(bucketKeyFunc BucketKeyFunc) *jobs {
 	now := bucketKeyFunc(time.Now())
@@ -154,14 +154,21 @@ func newTimeBucket(bucket string, previous *timeBucket) timeBucket {
 	}
 }
 
-func MillisBucketKey(date time.Time) string {
+// BucketKeyFunc used by the in memory Store to adjust the granurality of
+// the time buckets where the jobs are store.
+type BucketKeyFunc func(date time.Time) string
+
+// MillisKeys BucketKeyFunc with Milliseconds granurality.
+func MillisKeys(date time.Time) string {
 	return date.Truncate(time.Millisecond).UTC().Format(time.RFC3339)
 }
 
-func SecondsBucketKeyTo(date time.Time) string {
+// SecondsKeys BucketKeyFunc with Seconds granurality.
+func SecondsKeys(date time.Time) string {
 	return date.Truncate(time.Second).UTC().Format(time.RFC3339)
 }
 
-func MinutesBucketKeyTo(date time.Time) string {
+// MinutesKeys BucketKeyFunc with Minutes granurality.
+func MinutesKeys(date time.Time) string {
 	return date.Truncate(time.Minute).UTC().Format(time.RFC3339)
 }

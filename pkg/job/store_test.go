@@ -9,7 +9,7 @@ import (
 )
 
 func TestAddAndGetJob(t *testing.T) {
-	jobStore := job.NewMemoryStore(job.MillisBucketKey)
+	jobStore := job.NewMemoryStore(job.MillisKeys)
 	testJobFunction := func() error {
 		return nil
 	}
@@ -33,7 +33,7 @@ func TestAddAndGetJob(t *testing.T) {
 }
 
 func TestUpdateJobStatus(t *testing.T) {
-	jobStore := job.NewMemoryStore(job.MillisBucketKey)
+	jobStore := job.NewMemoryStore(job.MillisKeys)
 	testJobFunction := func() error {
 		return nil
 	}
@@ -93,7 +93,7 @@ func TestUpdateJobStatus(t *testing.T) {
 }
 
 func TestAddJobPastInTime(t *testing.T) {
-	jobStore := job.NewMemoryStore(job.MillisBucketKey)
+	jobStore := job.NewMemoryStore(job.MillisKeys)
 	testJobFunction := func() error {
 		return nil
 	}

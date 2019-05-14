@@ -22,19 +22,22 @@ const metadataPath = "metadata/"
 const status = "status"
 const uploaded = "uploaded"
 
+// AssetManager is responsible for the lifecycle of assets.
 type AssetManager interface {
 	PutURL(bucket string, assetID uuid.UUID) (*url.URL, error)
 	Uploaded(bucket string, assetID uuid.UUID) error
 	GetURL(bucket string, assetID uuid.UUID, timeout int64) (*url.URL, error)
 }
 
+// NewDefaultFileManager creates an AssetManager based on s3 with default configuration.
 func NewDefaultFileManager(sess *session.Session, region string) AssetManager {
-	store := job.NewMemoryStore(job.MinutesBucketKeyTo)
+	store := job.NewMemoryStore(job.MinutesKeys)
 	expirationDuration := 30 * time.Second
 	scheduler := schedule.NewSimpleScheduler(store, expirationDuration*2)
 	return News3AssetManager(sess, region, scheduler, expirationDuration)
 }
 
+// News3AssetManager creates an AssetManager based on s3 with custom configuration.
 func News3AssetManager(sess *session.Session, region string, scheduler schedule.SimpleScheduler, signedPutExpiration time.Duration) AssetManager {
 	svc := s3.New(sess, aws.NewConfig().WithRegion(region))
 	return &s3AssetManager{svc: svc, signedPutExpiration: signedPutExpiration, scheduler: scheduler}
@@ -119,7 +122,7 @@ func (ps *s3AssetManager) scheduleJob(bucket string, assetID uuid.UUID, tags map
 	return nil
 }
 
-func (ps *s3AssetManager) newUploadedFunction(bucket string, assetID uuid.UUID) job.JobFunction {
+func (ps *s3AssetManager) newUploadedFunction(bucket string, assetID uuid.UUID) job.Function {
 	return func() error {
 		tags := &s3.Tagging{
 			TagSet: []*s3.Tag{

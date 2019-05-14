@@ -22,7 +22,7 @@ func (s *immediateScheduler) Schedule(job job.Job) error {
 	if time.Now().Before(job.ExecutionDate) {
 		return auerr.FError(auerr.ErrorConflict, "Executed before execution date %s", job.ExecutionDate.String())
 	}
-	return job.JobFunction()
+	return job.Function()
 }
 
 func NewSimpleScheduler(Store job.Store, tickPeriod time.Duration) SimpleScheduler {
@@ -54,7 +54,7 @@ func (s *simpleScheduler) tick(checkTime time.Duration) {
 				if err != nil {
 					log.Println(err.Error())
 				}
-				err = job.JobFunction()
+				err = job.Function()
 				if err != nil {
 					log.Println(err.Error())
 					job = job.Error(err)

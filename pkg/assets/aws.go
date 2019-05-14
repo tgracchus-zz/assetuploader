@@ -7,6 +7,7 @@ import (
 	"github.com/tgracchus/assertuploader/pkg/auerr"
 )
 
+// NewAwsSession creates a new AWS session from the given credentials.
 func NewAwsSession(cred *credentials.Credentials) (*session.Session, error) {
 	if cred == nil {
 		return nil, auerr.SError(auerr.ErrorBadInput, "Credentials are nil")

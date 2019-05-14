@@ -14,6 +14,7 @@ import (
 const assetIDParam = "assetID"
 const timeoutQueryParam = "timeout"
 
+//RegisterAssetsEndpoints register to echo engine the assets endpoints.
 func RegisterAssetsEndpoints(e *echo.Echo, assetManager assets.AssetManager, bucket string) {
 	e.POST("/asset", newPostAssetEndpoint(assetManager, bucket))
 	e.PUT("/asset/:"+assetIDParam, newPutAssetEndpoint(assetManager, bucket))

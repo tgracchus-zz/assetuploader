@@ -94,7 +94,7 @@ func TestDoubleWrite(t *testing.T) {
 	signedPutExpiration := 2 * time.Second
 	mamager := assets.News3AssetManager(session, testRegion,
 		schedule.NewSimpleScheduler(
-			job.NewMemoryStore(job.SecondsBucketKeyTo),
+			job.NewMemoryStore(job.SecondsKeys),
 			signedPutExpiration/2,
 		),
 		signedPutExpiration,
