@@ -30,7 +30,7 @@ func main() {
 	e := echo.New()
 	e.HTTPErrorHandler = endpoints.AssetUploaderHTTPErrorHandler
 	credentials := credentials.NewStaticCredentials(awsKey, awsSecret, "")
-	session, err := assets.NewAwsSession(region, credentials)
+	session, err := assets.NewAwsSession(credentials)
 	if err != nil {
 		panic(err)
 	}

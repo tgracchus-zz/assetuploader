@@ -25,7 +25,7 @@ const testRegion = "​eu-west-1"
 
 func TestPutUrl(t *testing.T) {
 	cred := credentials.NewEnvCredentials()
-	session, err := assets.NewAwsSession(testRegion, cred)
+	session, err := assets.NewAwsSession(cred)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,7 +44,7 @@ func TestPutUrl(t *testing.T) {
 
 func TestUpdateIt(t *testing.T) {
 	cred := credentials.NewEnvCredentials()
-	session, err := assets.NewAwsSession(testRegion, cred)
+	session, err := assets.NewAwsSession(cred)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +86,7 @@ func TestUpdateIt(t *testing.T) {
 
 func TestDoubleWrite(t *testing.T) {
 	cred := credentials.NewEnvCredentials()
-	session, err := assets.NewAwsSession(testRegion, cred)
+	session, err := assets.NewAwsSession(cred)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -166,7 +166,7 @@ func TestDoubleWrite(t *testing.T) {
 
 func TestUpdateItFileDoesNotExist(t *testing.T) {
 	cred := credentials.NewEnvCredentials()
-	session, err := assets.NewAwsSession(testRegion, cred)
+	session, err := assets.NewAwsSession(cred)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -186,7 +186,7 @@ func TestUpdateItFileDoesNotExist(t *testing.T) {
 
 func TestPosterUrl(t *testing.T) {
 	cred := credentials.NewStaticCredentials("testCredentials", "testSecret", "testKey")
-	session, err := assets.NewAwsSession(testRegion, cred)
+	session, err := assets.NewAwsSession(cred)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -219,7 +219,7 @@ func TestPosterUrl(t *testing.T) {
 
 func TestSessionEmptyCredentials(t *testing.T) {
 	cred := &credentials.Credentials{}
-	_, err := assets.NewAwsSession(testRegion, cred)
+	_, err := assets.NewAwsSession(cred)
 
 	switch code := errors.Cause(err).Error(); code {
 	case auerr.ErrorBadInput:
@@ -229,7 +229,7 @@ func TestSessionEmptyCredentials(t *testing.T) {
 }
 
 func TestSessionNilCredentials(t *testing.T) {
-	_, err := assets.NewAwsSession(testRegion, nil)
+	_, err := assets.NewAwsSession(nil)
 	switch code := errors.Cause(err).Error(); code {
 	case auerr.ErrorBadInput:
 	default:
@@ -239,7 +239,7 @@ func TestSessionNilCredentials(t *testing.T) {
 
 func TestPosterEmptyArgs(t *testing.T) {
 	cred := credentials.NewStaticCredentials("testCredentials", "testSecret", "testKey")
-	session, err := assets.NewAwsSession(testRegion, cred)
+	session, err := assets.NewAwsSession(cred)
 	if err != nil {
 		t.Fatal(err)
 	}

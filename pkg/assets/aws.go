@@ -7,7 +7,7 @@ import (
 	"github.com/tgracchus/assertuploader/pkg/auerr"
 )
 
-func NewAwsSession(region string, cred *credentials.Credentials) (*session.Session, error) {
+func NewAwsSession(cred *credentials.Credentials) (*session.Session, error) {
 	if cred == nil {
 		return nil, auerr.SError(auerr.ErrorBadInput, "Credentials are nil")
 	}
@@ -16,7 +16,6 @@ func NewAwsSession(region string, cred *credentials.Credentials) (*session.Sessi
 	}
 	return session.Must(session.NewSession(
 		&aws.Config{
-			Region:      aws.String(region),
 			Credentials: cred,
 		})), nil
 }
