@@ -27,8 +27,7 @@ func newPostAssetEndpoint(assetManager assets.AssetManager, bucket string) func(
 		if err != nil {
 			return err
 		}
-		c.JSON(http.StatusOK, &postAssetResponse{UploadURL: url.String(), AssetID: assetID.String()})
-		return nil
+		return c.JSON(http.StatusOK, &postAssetResponse{UploadURL: url.String(), AssetID: assetID.String()})
 	}
 }
 
@@ -46,7 +45,7 @@ func newPutAssetEndpoint(assetManager assets.AssetManager, bucket string) func(c
 		statusUpdate := new(putAssetBody)
 		err = c.Bind(statusUpdate)
 		if err != nil {
-			return err
+			return auerr.CError(auerr.ErrorBadInput, err)
 		}
 
 		if statusUpdate.Status != "uploaded" {
@@ -57,8 +56,7 @@ func newPutAssetEndpoint(assetManager assets.AssetManager, bucket string) func(c
 		if err != nil {
 			return err
 		}
-		c.JSON(http.StatusAccepted, &putAssetResponse{Status: "Accepted"})
-		return nil
+		return c.JSON(http.StatusAccepted, &putAssetResponse{Status: "Accepted"})
 	}
 }
 
@@ -88,8 +86,7 @@ func newGetAssetEndpoint(assetManager assets.AssetManager, bucket string) func(c
 		if err != nil {
 			return err
 		}
-		c.JSON(http.StatusOK, &getAssetResponse{DownloadURL: url.String()})
-		return nil
+		return c.JSON(http.StatusOK, &getAssetResponse{DownloadURL: url.String()})
 	}
 }
 
