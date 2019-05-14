@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/google/uuid"
 	"github.com/tgracchus/assertuploader/pkg/auerr"
+	"github.com/tgracchus/assertuploader/pkg/job"
 	"github.com/tgracchus/assertuploader/pkg/schedule"
 )
 
@@ -27,15 +28,15 @@ type AssetManager interface {
 	GetURL(bucket string, assetID uuid.UUID, timeout int64) (*url.URL, error)
 }
 
-func NewDefaultFileManager(sess *session.Session) AssetManager {
-	store := schedule.NewMemoryJobStore(schedule.MinutesBucketKeyTo)
+func NewDefaultFileManager(sess *session.Session, region string) AssetManager {
+	store := job.NewMemoryStore(job.MinutesBucketKeyTo)
 	expirationDuration := 30 * time.Second
 	scheduler := schedule.NewSimpleScheduler(store, expirationDuration*2)
-	return News3AssetManager(sess, scheduler, expirationDuration)
+	return News3AssetManager(sess, region, scheduler, expirationDuration)
 }
 
-func News3AssetManager(sess *session.Session, scheduler schedule.SimpleScheduler, signedPutExpiration time.Duration) *s3AssetManager {
-	svc := s3.New(sess)
+func News3AssetManager(sess *session.Session, region string, scheduler schedule.SimpleScheduler, signedPutExpiration time.Duration) AssetManager {
+	svc := s3.New(sess, aws.NewConfig().WithRegion(region))
 	return &s3AssetManager{svc: svc, signedPutExpiration: signedPutExpiration, scheduler: scheduler}
 }
 
@@ -110,7 +111,7 @@ func (ps *s3AssetManager) scheduleJob(bucket string, assetID uuid.UUID, tags map
 		return auerr.CError(auerr.ErrorInternalError, err)
 	}
 	expirationDate := date.Add((time.Duration(expire) * 2) * time.Second)
-	job := schedule.NewFixedDateJob(assetID.String(), ps.newUploadedFunction(bucket, assetID), expirationDate)
+	job := job.NewFixedDateJob(assetID.String(), ps.newUploadedFunction(bucket, assetID), expirationDate)
 	err = ps.scheduler.Schedule(*job)
 	if err != nil {
 		return err
@@ -118,7 +119,7 @@ func (ps *s3AssetManager) scheduleJob(bucket string, assetID uuid.UUID, tags map
 	return nil
 }
 
-func (ps *s3AssetManager) newUploadedFunction(bucket string, assetID uuid.UUID) schedule.JobFunction {
+func (ps *s3AssetManager) newUploadedFunction(bucket string, assetID uuid.UUID) job.JobFunction {
 	return func() error {
 		tags := &s3.Tagging{
 			TagSet: []*s3.Tag{

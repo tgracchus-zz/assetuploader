@@ -15,10 +15,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/tgracchus/assertuploader/pkg/assets"
+	"github.com/tgracchus/assertuploader/pkg/auerr"
+	"github.com/tgracchus/assertuploader/pkg/job"
+	"github.com/tgracchus/assertuploader/pkg/schedule"
 )
 
-const testBucket = "dmc-asset-uploader-test"
-const testRegion = "​ ​us-west-2"
+const testBucket = "assertuploader"
+const testRegion = "​eu-west-1"
 
 func TestPutUrl(t *testing.T) {
 	cred := credentials.NewEnvCredentials()
@@ -26,10 +29,7 @@ func TestPutUrl(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	manager, err := assets.NewS3FileManager(session, scheduler.NewImmediateScheduler(), 2*time.Minute)
-	if err != nil {
-		t.Fatal(err)
-	}
+	manager := assets.News3AssetManager(session, testRegion, schedule.NewImmediateScheduler(), 2*time.Minute)
 	assetId, err := uuid.NewRandom()
 	if err != nil {
 		t.Fatal(err)
@@ -48,7 +48,7 @@ func TestUpdateIt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	poster, err := assets.NewS3FileManager(session, scheduler.NewImmediateScheduler(), 2*time.Minute)
+	manager := assets.News3AssetManager(session, testRegion, schedule.NewImmediateScheduler(), 2*time.Minute)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +57,7 @@ func TestUpdateIt(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	putUrl, err := poster.PutURL(testBucket, assetId)
+	putUrl, err := manager.PutURL(testBucket, assetId)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,7 +78,7 @@ func TestUpdateIt(t *testing.T) {
 		t.Fatalf("Error put with code %d", response.StatusCode)
 	}
 
-	err = poster.Uploaded(testBucket, assetId)
+	err = manager.Uploaded(testBucket, assetId)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,32 +92,28 @@ func TestDoubleWrite(t *testing.T) {
 	}
 
 	signedPutExpiration := 2 * time.Second
-	poster, err := assets.NewS3FileManager(session,
-		scheduler.NewSimpleScheduler(
-			scheduler.NewMemoryJobStore(func(date time.Time) time.Time {
-				return date.Truncate(time.Second)
-			}),
+	mamager := assets.News3AssetManager(session, testRegion,
+		schedule.NewSimpleScheduler(
+			job.NewMemoryStore(job.SecondsBucketKeyTo),
 			signedPutExpiration/2,
 		),
 		signedPutExpiration,
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+
 	assetId, err := uuid.NewRandom()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	putUrl, err := poster.PutURL(testBucket, assetId)
+	putURL, err := mamager.PutURL(testBucket, assetId)
 	if err != nil {
 		t.Fatal(err)
 	}
-	log.Println("The URL is:", putUrl.String(), " err:", err)
+	log.Println("The URL is:", putURL.String(), " err:", err)
 
-	req, err := http.NewRequest("PUT", putUrl.String(), strings.NewReader("CONTENT"))
+	req, err := http.NewRequest("PUT", putURL.String(), strings.NewReader("CONTENT"))
 	if err != nil {
-		fmt.Println("error creating request", putUrl.String())
+		fmt.Println("error creating request", putURL.String())
 		return
 	}
 	req.Header.Set("Content-Type", "text/plain")
@@ -129,20 +125,20 @@ func TestDoubleWrite(t *testing.T) {
 		t.Fatalf("Error put with code %d", response.StatusCode)
 	}
 
-	err = poster.Uploaded(testBucket, assetId)
+	err = mamager.Uploaded(testBucket, assetId)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	time.Sleep(5 * time.Second)
-	getUrl, err := poster.GetURL(testBucket, assetId, 15)
+	getUrl, err := mamager.GetURL(testBucket, assetId, 15)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	req, err = http.NewRequest("GET", getUrl.String(), nil)
 	if err != nil {
-		fmt.Println("error creating request", putUrl.String())
+		fmt.Println("error creating request", putURL.String())
 		return
 	}
 	response, err = http.DefaultClient.Do(req)
@@ -174,7 +170,7 @@ func TestUpdateItFileDoesNotExist(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	poster, err := assets.NewS3FileManager(session, scheduler.NewImmediateScheduler(), 2*time.Minute)
+	manager := assets.News3AssetManager(session, testRegion, schedule.NewImmediateScheduler(), 2*time.Minute)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,7 +178,7 @@ func TestUpdateItFileDoesNotExist(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = poster.Uploaded(testBucket, assetId)
+	err = manager.Uploaded(testBucket, assetId)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -194,7 +190,7 @@ func TestPosterUrl(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	poster, err := assets.NewS3FileManager(session, scheduler.NewImmediateScheduler(), 2*time.Minute)
+	manager := assets.News3AssetManager(session, testRegion, schedule.NewImmediateScheduler(), 2*time.Minute)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -203,21 +199,21 @@ func TestPosterUrl(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	putUrl, err := poster.PutURL(testBucket, assetId)
+	putURL, err := manager.PutURL(testBucket, assetId)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	log.Println("The URL is:", putUrl.String(), " err:", err)
+	log.Println("The URL is:", putURL.String(), " err:", err)
 
 	expectedHostName := "dmc-asset-uploader-test.s3.us-west-2.amazonaws.com"
-	if putUrl.Hostname() != expectedHostName {
-		t.Fatalf("Hostname should be %s, not %s", expectedHostName, putUrl.Hostname())
+	if putURL.Hostname() != expectedHostName {
+		t.Fatalf("Hostname should be %s, not %s", expectedHostName, putURL.Hostname())
 	}
 
 	expectedPath := "/" + assetId.String()
-	if putUrl.Path != expectedPath {
-		t.Fatalf("Path should be %s, not %s", expectedPath, putUrl.Path)
+	if putURL.Path != expectedPath {
+		t.Fatalf("Path should be %s, not %s", expectedPath, putURL.Path)
 	}
 }
 
@@ -226,7 +222,7 @@ func TestSessionEmptyCredentials(t *testing.T) {
 	_, err := assets.NewAwsSession(testRegion, cred)
 
 	switch code := errors.Cause(err).Error(); code {
-	case assets.ErrorEmptyAWSCredentials:
+	case auerr.ErrorBadInput:
 	default:
 		t.Fatalf("We are expected an auerrors.AUError")
 	}
@@ -235,7 +231,7 @@ func TestSessionEmptyCredentials(t *testing.T) {
 func TestSessionNilCredentials(t *testing.T) {
 	_, err := assets.NewAwsSession(testRegion, nil)
 	switch code := errors.Cause(err).Error(); code {
-	case assets.ErrorNoAWSCredentials:
+	case auerr.ErrorBadInput:
 	default:
 		t.Fatalf("We are expected an auerrors.AUError")
 	}
@@ -247,7 +243,7 @@ func TestPosterEmptyArgs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	poster, err := assets.NewS3FileManager(session, scheduler.NewImmediateScheduler(), 2*time.Minute)
+	manager := assets.News3AssetManager(session, testRegion, schedule.NewImmediateScheduler(), 2*time.Minute)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -256,7 +252,7 @@ func TestPosterEmptyArgs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = poster.PutURL("", assetId)
+	_, err = manager.PutURL("", assetId)
 	if err != nil {
 		if awsErr, ok := err.(awserr.Error); ok {
 			switch code := awsErr.Code(); code {
@@ -266,7 +262,7 @@ func TestPosterEmptyArgs(t *testing.T) {
 				t.Fatalf("We are expecteing an %s not %s", request.InvalidParameterErrCode, code)
 			}
 		} else {
-			t.Fatalf("We are expected an error")
+			t.Fatalf("We are expecting an InvalidParameterErrCode")
 		}
 	}
 }

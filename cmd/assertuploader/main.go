@@ -28,13 +28,13 @@ func main() {
 	awsSecret := viper.GetString("AWS_SECRET_ACCESS_KEY")
 
 	e := echo.New()
-	e.HTTPErrorHandler = AssetUploaderHTTPErrorHandler()
+	e.HTTPErrorHandler = endpoints.AssetUploaderHTTPErrorHandler
 	credentials := credentials.NewStaticCredentials(awsKey, awsSecret, "")
 	session, err := assets.NewAwsSession(region, credentials)
 	if err != nil {
 		panic(err)
 	}
-	manager := assets.NewDefaultFileManager(session)
+	manager := assets.NewDefaultFileManager(session, region)
 	endpoints.RegisterAssetsEndpoints(e, manager, bucket)
 	e.Logger.Fatal(e.Start(":8080"))
 }
