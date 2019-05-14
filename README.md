@@ -4,6 +4,9 @@
 TODO
 Test, Run and Build info
 Add echo test
+Integration test
+Add bonus points to README
+review README
 
 ## Endpoints
 ### POST ​​/asset  
