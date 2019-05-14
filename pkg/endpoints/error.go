@@ -10,21 +10,22 @@ import (
 )
 
 func AssetUploaderHTTPErrorHandler(err error, c echo.Context) {
-	c.Logger().Error(err)
-
+	if err, ok := err.(*echo.HTTPError); ok {
+		c.JSON(err.Code, err.Error())
+	}
 	switch code := errors.Cause(err).Error(); code {
 	case auerr.ErrorBadInput:
-		c.JSON(http.StatusBadRequest, err.Error())
+		c.JSON(http.StatusBadRequest, &httpError{err.Error()})
 	case auerr.ErrorConflict:
-		c.JSON(http.StatusConflict, err.Error())
+		c.JSON(http.StatusConflict, &httpError{err.Error()})
 	case auerr.ErrorNotFound:
-		c.JSON(http.StatusNotFound, err.Error())
+		c.JSON(http.StatusNotFound, &httpError{err.Error()})
 	case auerr.ErrorInternalError:
-		c.JSON(http.StatusInternalServerError, "Internal Server Error")
+		c.JSON(http.StatusInternalServerError, &httpError{err.Error()})
 	default:
-		c.JSON(http.StatusInternalServerError, "Internal Server Error")
+		c.JSON(http.StatusInternalServerError, &httpError{err.Error()})
 	}
-
+	c.Logger().Errorf("%+v", err)
 }
 
 type httpError struct {

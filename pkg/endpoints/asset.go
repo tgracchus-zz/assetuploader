@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/tgracchus/assertuploader/pkg/auerr"
+
 	"github.com/google/uuid"
 	"github.com/labstack/echo"
 	"github.com/tgracchus/assertuploader/pkg/assets"
@@ -23,7 +25,7 @@ func newPostAssetEndpoint(assetManager assets.AssetManager, bucket string) func(
 		assetID := uuid.New()
 		url, err := assetManager.PutURL(bucket, assetID)
 		if err != nil {
-			return nil
+			return err
 		}
 		c.JSON(http.StatusOK, &postAssetResponse{UploadURL: url.String(), AssetID: assetID.String()})
 		return nil
@@ -39,15 +41,29 @@ func newPutAssetEndpoint(assetManager assets.AssetManager, bucket string) func(c
 	return func(c echo.Context) error {
 		assetID, err := uuid.Parse(c.Param(assetIDParam))
 		if err != nil {
-			return nil
+			return err
 		}
+		statusUpdate := new(putAssetBody)
+		err = c.Bind(statusUpdate)
+		if err != nil {
+			return err
+		}
+
+		if statusUpdate.Status != "uploaded" {
+			return auerr.FError(auerr.ErrorBadInput, "Expected status uploaded, not %s", statusUpdate.Status)
+		}
+
 		err = assetManager.Uploaded(bucket, assetID)
 		if err != nil {
-			return nil
+			return err
 		}
-		c.JSON(http.StatusAccepted, &putAssetResponse{Status: "Completed"})
+		c.JSON(http.StatusAccepted, &putAssetResponse{Status: "Accepted"})
 		return nil
 	}
+}
+
+type putAssetBody struct {
+	Status string `json:"Status"`
 }
 
 type putAssetResponse struct {
@@ -58,7 +74,7 @@ func newGetAssetEndpoint(assetManager assets.AssetManager, bucket string) func(c
 	return func(c echo.Context) error {
 		assetID, err := uuid.Parse(c.Param(assetIDParam))
 		if err != nil {
-			return nil
+			return err
 		}
 		timeoutParam := c.QueryParam(timeoutQueryParam)
 		if timeoutParam == "" {
@@ -66,12 +82,11 @@ func newGetAssetEndpoint(assetManager assets.AssetManager, bucket string) func(c
 		}
 		timeout, err := strconv.ParseInt(timeoutParam, 10, 64)
 		if err != nil {
-			return nil
+			return err
 		}
-
 		url, err := assetManager.GetURL(bucket, assetID, timeout)
 		if err != nil {
-			return nil
+			return err
 		}
 		c.JSON(http.StatusOK, &getAssetResponse{DownloadURL: url.String()})
 		return nil

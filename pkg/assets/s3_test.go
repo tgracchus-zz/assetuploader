@@ -20,8 +20,8 @@ import (
 	"github.com/tgracchus/assertuploader/pkg/schedule"
 )
 
-const testBucket = "assertuploader"
-const testRegion = "​eu-west-1"
+const testBucket = "​dmc-asset-uploader-test"
+const testRegion = "​us-west-2"
 
 func TestPutUrl(t *testing.T) {
 	cred := credentials.NewEnvCredentials()
