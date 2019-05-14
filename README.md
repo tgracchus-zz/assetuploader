@@ -3,6 +3,7 @@
 ## How to:
 TODO
 Test, Run and Build info
+Add echo test
 
 ## Endpoints
 ### POST ​​/asset  
