@@ -1,4 +1,9 @@
 # Asset uploader
+
+## How to:
+TODO
+Test, Run and Build info
+
 ## Endpoints
 ### POST ​​/asset  
 * **Description**:  
@@ -8,9 +13,9 @@ Creates a new asset with a random uuid and returns a url to put the asset
 empty  
 
 * **Response**:  
-```json
-{ ​​​
-“upload_url”:​​<s3-signed-url-for-upload>, ​​​“id”:​​<asset-id>
+```
+{
+"upload_url":​​"<s3-signed-url-for-upload>", ​​"id":​​"<asset-id>"
 }
 ```
 Response code | Description
@@ -83,8 +88,8 @@ read-after-write consistency, because we will have a write-after-read -> eventua
 Will mark the upload operation as completed. Eventually, by default after 1 minute
 
 * Body: 
-```json
-{ ​​​“Status”:​​“uploaded” }
+```
+{ ​​​"Status":​​"uploaded" }
 ```  
 
 * Response:  
@@ -111,8 +116,8 @@ That explains the 201 and not a 200 as successful response code
 Will get a signed s3 url for getting the object
 
 * Response:  
-```json
-{ ​​​“Download_url”:​​<s3-signed-url-for-upload> } 
+```
+{ ​​​"Download_url":​​"<s3-signed-url-for-upload>" } 
 ```
 
 Response code | Description
@@ -138,7 +143,7 @@ If that occurs, one possible solution is to use some event drive architecture: l
 Following pkg, cmd and build patterns as seen here
 https://github.com/golang-standards/project-layout
 
-# Vendoring
+## Vendoring
 Dep is used for vendoring
 https://golang.github.io/dep/
 
