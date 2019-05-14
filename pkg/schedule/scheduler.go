@@ -4,8 +4,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/tgracchus/assertuploader/pkg/auerr"
-	"github.com/tgracchus/assertuploader/pkg/job"
+	"github.com/tgracchus/assetuploader/pkg/auerr"
+	"github.com/tgracchus/assetuploader/pkg/job"
 )
 
 type SimpleScheduler interface {

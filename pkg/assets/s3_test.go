@@ -14,10 +14,10 @@ import (
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
-	"github.com/tgracchus/assertuploader/pkg/assets"
-	"github.com/tgracchus/assertuploader/pkg/auerr"
-	"github.com/tgracchus/assertuploader/pkg/job"
-	"github.com/tgracchus/assertuploader/pkg/schedule"
+	"github.com/tgracchus/assetuploader/pkg/assets"
+	"github.com/tgracchus/assetuploader/pkg/auerr"
+	"github.com/tgracchus/assetuploader/pkg/job"
+	"github.com/tgracchus/assetuploader/pkg/schedule"
 )
 
 const testBucket = "​dmc-asset-uploader-test"

@@ -11,9 +11,9 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/google/uuid"
-	"github.com/tgracchus/assertuploader/pkg/auerr"
-	"github.com/tgracchus/assertuploader/pkg/job"
-	"github.com/tgracchus/assertuploader/pkg/schedule"
+	"github.com/tgracchus/assetuploader/pkg/auerr"
+	"github.com/tgracchus/assetuploader/pkg/job"
+	"github.com/tgracchus/assetuploader/pkg/schedule"
 )
 
 var emptyCredentials = credentials.Credentials{}

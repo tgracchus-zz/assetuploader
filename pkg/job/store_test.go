@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/tgracchus/assertuploader/pkg/job"
+	"github.com/tgracchus/assetuploader/pkg/job"
 )
 
 func TestAddAndGetJob(t *testing.T) {

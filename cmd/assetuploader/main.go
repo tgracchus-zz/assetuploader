@@ -9,8 +9,8 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/labstack/echo"
-	"github.com/tgracchus/assertuploader/pkg/assets"
-	"github.com/tgracchus/assertuploader/pkg/endpoints"
+	"github.com/tgracchus/assetuploader/pkg/assets"
+	"github.com/tgracchus/assetuploader/pkg/endpoints"
 )
 
 func main() {

@@ -4,7 +4,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/tgracchus/assertuploader/pkg/auerr"
+	"github.com/tgracchus/assetuploader/pkg/auerr"
 )
 
 // NewAwsSession creates a new AWS session from the given credentials.

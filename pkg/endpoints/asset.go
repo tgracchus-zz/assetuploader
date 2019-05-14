@@ -4,11 +4,11 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/tgracchus/assertuploader/pkg/auerr"
+	"github.com/tgracchus/assetuploader/pkg/auerr"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo"
-	"github.com/tgracchus/assertuploader/pkg/assets"
+	"github.com/tgracchus/assetuploader/pkg/assets"
 )
 
 const assetIDParam = "assetID"

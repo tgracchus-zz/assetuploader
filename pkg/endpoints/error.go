@@ -3,7 +3,7 @@ package endpoints
 import (
 	"net/http"
 
-	"github.com/tgracchus/assertuploader/pkg/auerr"
+	"github.com/tgracchus/assetuploader/pkg/auerr"
 
 	"github.com/labstack/echo"
 	"github.com/pkg/errors"
