@@ -1,9 +1,4 @@
 # Asset uploader
-
-TODO
-Add echo test
-review README
-
 ### How to create distributions
 ```bash
 build/distribution.sh
