@@ -28,7 +28,7 @@ func newPostAssetEndpoint(assetManager assets.AssetManager, bucket string) func(
 		if err != nil {
 			return err
 		}
-		return c.JSON(http.StatusOK, &postAssetResponse{UploadURL: url.String(), AssetID: assetID.String()})
+		return c.JSON(http.StatusCreated, &postAssetResponse{UploadURL: url.String(), AssetID: assetID.String()})
 	}
 }
 
@@ -41,7 +41,7 @@ func newPutAssetEndpoint(assetManager assets.AssetManager, bucket string) func(c
 	return func(c echo.Context) error {
 		assetID, err := uuid.Parse(c.Param(assetIDParam))
 		if err != nil {
-			return err
+			return auerr.CError(auerr.ErrorBadInput, err)
 		}
 		statusUpdate := new(putAssetBody)
 		err = c.Bind(statusUpdate)
@@ -73,7 +73,7 @@ func newGetAssetEndpoint(assetManager assets.AssetManager, bucket string) func(c
 	return func(c echo.Context) error {
 		assetID, err := uuid.Parse(c.Param(assetIDParam))
 		if err != nil {
-			return err
+			return auerr.CError(auerr.ErrorBadInput, err)
 		}
 		timeoutParam := c.QueryParam(timeoutQueryParam)
 		if timeoutParam == "" {

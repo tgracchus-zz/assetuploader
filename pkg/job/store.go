@@ -11,7 +11,7 @@ type Store interface {
 	GetBefore(date time.Time, statuses []Status) ([]Job, error)
 }
 
-// NewMemoryStore it´s an in memory Store
+// NewMemoryStore it´s an in memory Store using time buckets to classify jobs.
 func NewMemoryStore(bucketKeyFunc BucketKeyFunc) Store {
 	upSert := make(chan Job, 1000)
 	query := make(chan getBefore, 1000)
@@ -72,13 +72,13 @@ func memoryJobStoreMonitor(bucketKeyFunc BucketKeyFunc, upSert chan Job, query c
 func newTimeBuckets(bucketKeyFunc BucketKeyFunc) *jobs {
 	now := bucketKeyFunc(time.Now())
 	bucket := newTimeBucket(now, nil)
-	buckets := make(map[string]timeBucket)
+	buckets := make(map[int64]timeBucket)
 	buckets[now] = bucket
 	return &jobs{buckets, &bucket, bucketKeyFunc}
 }
 
 type jobs struct {
-	Buckets       map[string]timeBucket `json:"buckets"`
+	Buckets       map[int64]timeBucket `json:"buckets"`
 	headBucket    *timeBucket
 	bucketKeyFunc BucketKeyFunc
 }
@@ -94,11 +94,11 @@ func (j *jobs) getBefore(before getBefore) []Job {
 }
 
 func (j *jobs) findBucketsBefore(before getBefore) []Job {
-	buketKey := j.bucketKeyFunc(before.date)
+	bucketKey := j.bucketKeyFunc(before.date)
 	bucket := j.headBucket
 	jobs := make([]Job, 0, 0)
 	for bucket != nil {
-		if bucket.bucketKey <= buketKey {
+		if bucket.bucketKey <= bucketKey {
 			for _, job := range bucket.Jobs {
 				if ok := before.status[job.Status]; ok {
 					jobs = append(jobs, job)
@@ -110,7 +110,7 @@ func (j *jobs) findBucketsBefore(before getBefore) []Job {
 	return jobs
 }
 
-func (j *jobs) findOrCreateBucket(bucketKey string) *timeBucket {
+func (j *jobs) findOrCreateBucket(bucketKey int64) *timeBucket {
 	bucket := j.headBucket
 	var lastBucket *timeBucket
 	for bucket != nil {
@@ -141,12 +141,12 @@ func (j *jobs) findOrCreateBucket(bucketKey string) *timeBucket {
 }
 
 type timeBucket struct {
-	bucketKey string         `json:"-"`
+	bucketKey int64          `json:"-"`
 	Jobs      map[string]Job `json:"jobs"`
 	previous  *timeBucket    `json:"-"`
 }
 
-func newTimeBucket(bucket string, previous *timeBucket) timeBucket {
+func newTimeBucket(bucket int64, previous *timeBucket) timeBucket {
 	return timeBucket{
 		Jobs:      make(map[string]Job),
 		previous:  previous,
@@ -156,19 +156,19 @@ func newTimeBucket(bucket string, previous *timeBucket) timeBucket {
 
 // BucketKeyFunc used by the in memory Store to adjust the granurality of
 // the time buckets where the jobs are store.
-type BucketKeyFunc func(date time.Time) string
+type BucketKeyFunc func(date time.Time) int64
 
 // MillisKeys BucketKeyFunc with Milliseconds granurality.
-func MillisKeys(date time.Time) string {
-	return date.Truncate(time.Millisecond).UTC().Format(time.RFC3339)
+func MillisKeys(date time.Time) int64 {
+	return date.Truncate(time.Millisecond).UTC().Unix()
 }
 
 // SecondsKeys BucketKeyFunc with Seconds granurality.
-func SecondsKeys(date time.Time) string {
-	return date.Truncate(time.Second).UTC().Format(time.RFC3339)
+func SecondsKeys(date time.Time) int64 {
+	return date.Truncate(time.Second).UTC().Unix()
 }
 
 // MinutesKeys BucketKeyFunc with Minutes granurality.
-func MinutesKeys(date time.Time) string {
-	return date.Truncate(time.Minute).UTC().Format(time.RFC3339)
+func MinutesKeys(date time.Time) int64 {
+	return date.Truncate(time.Minute).UTC().Unix()
 }
