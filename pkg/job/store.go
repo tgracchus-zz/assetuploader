@@ -4,69 +4,64 @@ import (
 	"time"
 )
 
-// Store is a time aware job store, it´s able to retrieve all the jobs with the given status
-// and meant to be executed a given date.
-type Store interface {
-	UpSert(job Job) error
-	GetBefore(date time.Time, statuses []Status) ([]Job, error)
-}
-
-// NewMemoryStore it´s an in memory Store using time buckets to classify jobs.
-func NewMemoryStore(bucketKeyFunc BucketKeyFunc) Store {
+// NewStore instantiates a new store with the given store function.
+func NewStore(store Store) (chan Job, chan StoreQuery, chan []Job) {
 	upSert := make(chan Job, 1000)
-	query := make(chan getBefore, 1000)
+	query := make(chan StoreQuery, 1000)
 	out := make(chan []Job, 1000)
-	store := &memoryJobStore{upSert: upSert, query: query, out: out}
-	memoryJobStoreMonitor(bucketKeyFunc, upSert, query, out)
-	return store
+	store(upSert, query, out)
+	return upSert, query, out
 }
 
-type memoryJobStore struct {
-	upSert chan<- Job
-	query  chan<- getBefore
-	out    <-chan []Job
-}
-
-func (st *memoryJobStore) UpSert(job Job) error {
-	st.upSert <- job
+// UpSert sends a job to the upset channel of a store.
+func UpSert(upSert chan Job, job Job) error {
+	upSert <- job
 	return nil
 }
 
-func (st *memoryJobStore) GetBefore(date time.Time, statuses []Status) ([]Job, error) {
+// GetBefore ask for jobs whith status and with execution date before than the given one.
+func GetBefore(query chan StoreQuery, out chan []Job, date time.Time, statuses []Status) ([]Job, error) {
 	statusesMap := make(map[Status]bool)
 	for _, status := range statuses {
 		statusesMap[status] = true
 	}
-	st.query <- getBefore{date: date, status: statusesMap}
-	return <-st.out, nil
+	query <- StoreQuery{date: date, status: statusesMap}
+	return <-out, nil
 }
 
-type getBefore struct {
+// StoreQuery struct to query for jobs with status and with executionDate before date.
+type StoreQuery struct {
 	date   time.Time
 	status map[Status]bool
 }
 
-func memoryJobStoreMonitor(bucketKeyFunc BucketKeyFunc, upSert chan Job, query chan getBefore, out chan []Job) {
-	jobs := newTimeBuckets(bucketKeyFunc)
-	go func() {
-		for {
-			select {
-			case job, ok := <-upSert:
-				if !ok {
-					upSert = nil
+// Store is a function for storing and look for jobs
+type Store func(upSert chan Job, query chan StoreQuery, storeQueryResult chan []Job)
+
+// NewMemoryStore creates an in memory Store using time buckets to classify jobs.
+func NewMemoryStore(bucketKeyFunc BucketKeyFunc) Store {
+	return func(upSert chan Job, query chan StoreQuery, storeQueryResult chan []Job) {
+		jobs := newTimeBuckets(bucketKeyFunc)
+		go func() {
+			for {
+				select {
+				case job, ok := <-upSert:
+					if !ok {
+						upSert = nil
+					}
+					jobs.upsert(job)
+				case get, ok := <-query:
+					if !ok {
+						query = nil
+					}
+					storeQueryResult <- jobs.getBefore(get)
 				}
-				jobs.upsert(job)
-			case get, ok := <-query:
-				if !ok {
-					query = nil
+				if upSert == nil && query == nil {
+					break
 				}
-				out <- jobs.getBefore(get)
 			}
-			if upSert == nil && query == nil {
-				break
-			}
-		}
-	}()
+		}()
+	}
 }
 
 func newTimeBuckets(bucketKeyFunc BucketKeyFunc) *jobs {
@@ -89,11 +84,11 @@ func (j *jobs) upsert(job Job) {
 	bucket.Jobs[job.ID] = job
 }
 
-func (j *jobs) getBefore(before getBefore) []Job {
+func (j *jobs) getBefore(before StoreQuery) []Job {
 	return j.findBucketsBefore(before)
 }
 
-func (j *jobs) findBucketsBefore(before getBefore) []Job {
+func (j *jobs) findBucketsBefore(before StoreQuery) []Job {
 	bucketKey := j.bucketKeyFunc(before.date)
 	bucket := j.headBucket
 	jobs := make([]Job, 0, 0)

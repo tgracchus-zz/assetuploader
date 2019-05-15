@@ -33,9 +33,9 @@ type AssetManager interface {
 
 // NewDefaultFileManager creates an AssetManager based on s3 with scheduled execution.
 func NewDefaultFileManager(sess *session.Session, region string) AssetManager {
-	store := job.NewMemoryStore(job.MinutesKeys)
+	upsert, query, response := job.NewStore(job.NewMemoryStore(job.MinutesKeys))
 	expirationDuration := 30 * time.Second
-	scheduler := schedule.NewSimpleScheduler(store, expirationDuration)
+	scheduler := schedule.NewSimpleScheduler(upsert, query, response, expirationDuration)
 	return News3AssetManager(sess, region, scheduler, expirationDuration)
 }
 

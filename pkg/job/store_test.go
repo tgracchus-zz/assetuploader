@@ -9,18 +9,18 @@ import (
 )
 
 func TestAddAndGetJob(t *testing.T) {
-	jobStore := job.NewMemoryStore(job.MillisKeys)
+	upsert, query, response := job.NewStore(job.NewMemoryStore(job.MillisKeys))
 	testJobFunction := func() error {
 		return nil
 	}
 	executionDate := time.Now()
 	expectedJob := job.NewFixedDateJob(uuid.New().String(), testJobFunction, executionDate)
-	err := jobStore.UpSert(*expectedJob)
+	err := job.UpSert(upsert, *expectedJob)
 	if err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(250 * time.Millisecond)
-	jobs, err := jobStore.GetBefore(executionDate, []job.Status{expectedJob.Status})
+	jobs, err := job.GetBefore(query, response, executionDate, []job.Status{expectedJob.Status})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,28 +33,28 @@ func TestAddAndGetJob(t *testing.T) {
 }
 
 func TestUpdateJobStatus(t *testing.T) {
-	jobStore := job.NewMemoryStore(job.MillisKeys)
+	upsert, query, response := job.NewStore(job.NewMemoryStore(job.MillisKeys))
 	testJobFunction := func() error {
 		return nil
 	}
 	executionDate := time.Now()
 	newJob := job.NewFixedDateJob(uuid.New().String(), testJobFunction, executionDate)
-	err := jobStore.UpSert(*newJob)
+	err := job.UpSert(upsert, *newJob)
 	if err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(250 * time.Millisecond)
-	foundJobs, err := jobStore.GetBefore(executionDate, []job.Status{newJob.Status})
+	foundJobs, err := job.GetBefore(query, response, executionDate, []job.Status{newJob.Status})
 	if err != nil {
 		t.Fatal(err)
 	}
 	updatedJob := newJob.Executing()
-	err = jobStore.UpSert(updatedJob)
+	err = job.UpSert(upsert, *updatedJob)
 	if err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(250 * time.Millisecond)
-	updatedFoundJobs, err := jobStore.GetBefore(executionDate, []job.Status{updatedJob.Status})
+	updatedFoundJobs, err := job.GetBefore(query, response, executionDate, []job.Status{updatedJob.Status})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,19 +93,19 @@ func TestUpdateJobStatus(t *testing.T) {
 }
 
 func TestAddJobPastInTime(t *testing.T) {
-	jobStore := job.NewMemoryStore(job.MillisKeys)
+	upsert, query, response := job.NewStore(job.NewMemoryStore(job.MillisKeys))
 	testJobFunction := func() error {
 		return nil
 	}
 	now := time.Now()
 	pastExecutionDate := now.Add(-1 * time.Hour)
 	pastJob := job.NewFixedDateJob(uuid.New().String(), testJobFunction, pastExecutionDate)
-	err := jobStore.UpSert(*pastJob)
+	err := job.UpSert(upsert, *pastJob)
 	if err != nil {
 		t.Fatal(err)
 	}
 	newJob := job.NewFixedDateJob(uuid.New().String(), testJobFunction, now)
-	err = jobStore.UpSert(*newJob)
+	err = job.UpSert(upsert, *newJob)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,7 +113,7 @@ func TestAddJobPastInTime(t *testing.T) {
 	// Since JobStore follows PRAM consistency model,
 	// we need to wait for the add channel to be drained, so we can observe the two jobs
 	time.Sleep(250 * time.Millisecond)
-	foundJobs, err := jobStore.GetBefore(now, []job.Status{newJob.Status})
+	foundJobs, err := job.GetBefore(query, response, now, []job.Status{newJob.Status})
 	if err != nil {
 		t.Fatal(err)
 	}

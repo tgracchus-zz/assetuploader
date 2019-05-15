@@ -11,44 +11,54 @@ import (
 )
 
 func TestScheduleJob(t *testing.T) {
-	jobs := make(map[string]job.Job)
-	simpleScheduler := schedule.NewSimpleScheduler(NewMockJobStore(jobs), 200*time.Millisecond)
+	upsert, query, responses := job.NewStore(job.NewMemoryStore(job.MillisKeys))
+	simpleScheduler := schedule.NewSimpleScheduler(upsert, query, responses, 200*time.Millisecond)
 	executionDate := time.Now()
 
-	job := job.NewFixedDateJob(uuid.New().String(), jobCallBack, executionDate)
-	simpleScheduler.Schedule(*job)
+	newJob := job.NewFixedDateJob(uuid.New().String(), jobCallBack, executionDate)
+	simpleScheduler.Schedule(*newJob)
 	// Need to wait for the first tick at least
 	time.Sleep(500 * time.Millisecond)
-
-	if job, ok := jobs[job.ID]; ok {
-		if !job.IsCompleted() {
-			t.Fatal("We expect the job to be done")
-		}
-	} else {
-		t.Fatal("We expect the job to be scheduled")
+	jobs, err := job.GetBefore(query, responses, time.Now(), []job.Status{job.CompletedStatus})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(jobs) != 1 {
+		t.Fatalf("We are expecting 1 job, not %d", len(jobs))
+	}
+	foundJob := jobs[0]
+	if foundJob.ID != newJob.ID {
+		t.Fatalf("We recover a different jobs")
 	}
 }
 
 func TestScheduleJobFails(t *testing.T) {
-	jobs := make(map[string]job.Job)
-	simpleScheduler := schedule.NewSimpleScheduler(NewMockJobStore(jobs), 200*time.Millisecond)
+	upsert, query, responses := job.NewStore(job.NewMemoryStore(job.MillisKeys))
+	simpleScheduler := schedule.NewSimpleScheduler(upsert, query, responses, 200*time.Millisecond)
 	executionDate := time.Now()
 
-	job := job.NewFixedDateJob(uuid.New().String(), errorCallBack, executionDate)
-	simpleScheduler.Schedule(*job)
+	newJob := job.NewFixedDateJob(uuid.New().String(), errorCallBack, executionDate)
+	simpleScheduler.Schedule(*newJob)
 	// Need to wait for the first tick at least
 	time.Sleep(500 * time.Millisecond)
-
-	if job, ok := jobs[job.ID]; ok {
-		if !job.IsError() {
-			t.Fatalf("We expect the job to be failed, not %s", job.Status)
-		}
-		if job.StatusMsg != "errorCallBack" {
-			t.Fatal("We expect the status message to be errorCallBack")
-		}
-	} else {
-		t.Fatal("We expect the job to be scheduled")
+	jobs, err := job.GetBefore(query, responses, time.Now(), []job.Status{job.ErrorStatus})
+	if err != nil {
+		t.Fatal(err)
 	}
+	if len(jobs) != 1 {
+		t.Fatalf("We are expecting 1 job, not %d", len(jobs))
+	}
+	foundJob := jobs[0]
+	if foundJob.ID != newJob.ID {
+		t.Fatalf("We recover a different jobs")
+	}
+	if !foundJob.IsError() {
+		t.Fatalf("We expect the job to be failed, not %s", foundJob.Status)
+	}
+	if foundJob.StatusMsg != "errorCallBack" {
+		t.Fatal("We expect the status message to be errorCallBack")
+	}
+
 }
 
 var jobCallBack = func() error {
@@ -57,27 +67,4 @@ var jobCallBack = func() error {
 
 var errorCallBack = func() error {
 	return errors.New("errorCallBack")
-}
-
-func NewMockJobStore(jobs map[string]job.Job) job.Store {
-	return &mockJobStore{jobs: jobs}
-}
-
-type mockJobStore struct {
-	jobs map[string]job.Job
-}
-
-func (ms *mockJobStore) UpSert(job job.Job) error {
-	ms.jobs[job.ID] = job
-	return nil
-}
-
-func (ms *mockJobStore) GetBefore(date time.Time, statuses []job.Status) ([]job.Job, error) {
-	jobsList := make([]job.Job, len(ms.jobs))
-	i := 0
-	for _, v := range ms.jobs {
-		jobsList[i] = v
-		i++
-	}
-	return jobsList, nil
 }
