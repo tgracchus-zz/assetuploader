@@ -89,8 +89,7 @@ Response code | Description
 500 | Internal Error
 
 
-
-**PUT ​​/asset/<asset-id>** endpoint  
+### PUT ​​/asset/<asset-id>**   
 Since the 
 [S3 consistency model](https://docs.aws.amazon.com/AmazonS3/latest/dev/Introduction.html#ConsistencyModel
 )
