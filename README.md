@@ -3,38 +3,41 @@
 ```bash
 build/distribution.sh
 ```
-In order to run it:  
+In order to run them:  
 * Make sure to define  
 export AWS_ACCESS_KEY_ID=XXXXX  
 export AWS_SECRET_ACCESS_KEY=XXXXX  
-
+* Run
 ```bash
 ./assetuploader-1.0-darwin-x86_64 --region=${AWS_REGION} --bucket=${AWS_BUCKET}
 ```
 
 ### How to Run inplace
-Make sure to define:  
+* Make sure to define:  
 export AWS_ACCESS_KEY_ID=XXXXX  
 export AWS_SECRET_ACCESS_KEY=XXXXXX  
 export AWS_REGION=XXXXX  
 export AWS_BUCKET=XXXXX  
-Otherwise the scrip will fail.
+Otherwise the scrip will fail.  
+* Run
 ```bash
 build/run.sh
 ```
 
 ### How to Test
+* Run  
 ```bash
 build/test.sh
 ```
 
 ### How to Integration Test
-Make sure to define:  
+* Make sure to define:    
 export AWS_ACCESS_KEY_ID=XXXXX  
 export AWS_SECRET_ACCESS_KEY=XXXXXX  
 export AWS_REGION=XXXXX  
 export AWS_BUCKET=XXXXX  
 Otherwise the scrip will fail.
+* Run  
 ```bash
 build/itest.sh
 ```
