@@ -133,6 +133,18 @@ func (ps *s3AssetManager) newUploadedFunction(bucket string, assetID uuid.UUID) 
 				Key:        aws.String(uploadedPath + assetID.String()),
 			},
 		)
+		if err != nil {
+			if awsErr, ok := err.(awserr.RequestFailure); ok {
+				switch code := awsErr.StatusCode(); code {
+				case 404:
+					return auerr.FError(auerr.ErrorNotFound, "Asset %s is not found", assetID.String())
+				default:
+					return auerr.CError(auerr.ErrorInternalError, err)
+				}
+			}
+			return auerr.CError(auerr.ErrorInternalError, err)
+		}
+
 		// Mark metadata as uploaded
 		// if this fails, the request will fail, so it retried, the copy object will simple overwrite the current object
 		_, err = ps.svc.PutObjectTagging(
@@ -157,7 +169,6 @@ func (ps *s3AssetManager) newUploadedFunction(bucket string, assetID uuid.UUID) 
 			}
 			return auerr.CError(auerr.ErrorInternalError, err)
 		}
-
 		return nil
 	}
 }
