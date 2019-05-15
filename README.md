@@ -87,7 +87,7 @@ empty
 ```
 Response code | Description
 ------------ | -------------
-200 | Asset ok
+201 | Asset id created
 500 | Internal Error
 
 
@@ -159,8 +159,8 @@ Empty
 
 Response code | Description
 ------------ | -------------
-201 | Query accepted
-400 | If the body is incorrect
+202 | Query accepted
+400 | If the request is incorrect
 404 | If the asset id is not found
 500 | Internal Error
 
@@ -204,6 +204,7 @@ Will get a signed s3 url for getting the object
 Response code | Description
 ------------ | -------------
 200 | Query succeed
+400 | If the request is incorrect
 404 | If the asset id is not found
 500 | Internal Error
 
