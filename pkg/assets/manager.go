@@ -2,7 +2,6 @@ package assets
 
 import (
 	"net/url"
-	"strconv"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -18,7 +17,9 @@ import (
 
 var emptyCredentials = credentials.Credentials{}
 
+const uploadedPath = "uploaded/"
 const metadataPath = "metadata/"
+const temporalPath = "temp/"
 const status = "status"
 const uploaded = "uploaded"
 
@@ -53,7 +54,7 @@ func (ps *s3AssetManager) PutURL(bucket string, assetID uuid.UUID) (*url.URL, er
 	// Create signed url
 	signReq, _ := ps.svc.PutObjectRequest(&s3.PutObjectInput{
 		Bucket: aws.String(bucket),
-		Key:    aws.String(assetID.String()),
+		Key:    aws.String(temporalPath + assetID.String()),
 	})
 
 	postURLString, err := signReq.Presign(ps.signedPutExpiration)
@@ -70,7 +71,7 @@ func (ps *s3AssetManager) PutURL(bucket string, assetID uuid.UUID) (*url.URL, er
 	tags.Set("X-Amz-Expires", postURL.Query().Get("X-Amz-Expires"))
 	tags.Set("X-Amz-Date", postURL.Query().Get("X-Amz-Date"))
 
-	// Create signed url timeout mark
+	// Create signed mark
 	_, err = ps.svc.PutObject(&s3.PutObjectInput{
 		Bucket:  aws.String(bucket),
 		Key:     aws.String(metadataPath + assetID.String()),
@@ -95,67 +96,41 @@ func (ps *s3AssetManager) Uploaded(bucket string, assetID uuid.UUID) error {
 			return auerr.FError(auerr.ErrorConflict, "Asset %s already uploaded", key)
 		}
 	}
-	err = ps.scheduleJob(bucket, assetID, tags)
-	if err != nil {
-		return err
-	}
-	return nil
-}
+	// Move the asset to the uploaded folder
+	_, err = ps.svc.CopyObject(
+		&s3.CopyObjectInput{
+			CopySource: aws.String(bucket + "/" + temporalPath + assetID.String()),
+			Bucket:     aws.String(bucket),
+			Key:        aws.String(uploadedPath + assetID.String()),
+		},
+	)
 
-func (ps *s3AssetManager) scheduleJob(bucket string, assetID uuid.UUID, tags map[string]*s3.Tag) error {
-	expireS := tags["X-Amz-Expires"]
-	expire, err := strconv.Atoi(*expireS.Value)
-	if err != nil {
-		return auerr.CError(auerr.ErrorInternalError, err)
-	}
-	dateS := tags["X-Amz-Date"]
-	date, err := time.Parse("20060102T150405Z0700", *dateS.Value)
-	if err != nil {
-		return auerr.CError(auerr.ErrorInternalError, err)
-	}
-
-	expirationDate := date.Add(time.Duration(expire) * time.Second)
-	//Add a 10% more of the expiration duration, just to be safe.
-	offset := time.Duration(expire) * time.Second * 0.10
-	expirationDateWithOffset := expirationDate.Add(offset)
-
-	// if not yet expired, schedule the completetion
-	job := job.NewFixedDateJob(assetID.String(), ps.newStatusUpdate(bucket, assetID), expirationDateWithOffset)
-	err = ps.scheduler.Schedule(*job)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (ps *s3AssetManager) newStatusUpdate(bucket string, assetID uuid.UUID) job.Function {
-	return func() error {
-		tags := &s3.Tagging{
-			TagSet: []*s3.Tag{
-				{Key: aws.String(status), Value: aws.String(uploaded)},
+	// Mark metadata as uploaded
+	// if this fails, the request will fail, so it retried, the copy object will simple overwrite the current object
+	_, err = ps.svc.PutObjectTagging(
+		&s3.PutObjectTaggingInput{
+			Bucket: aws.String(bucket),
+			Key:    aws.String(metadataPath + assetID.String()),
+			Tagging: &s3.Tagging{
+				TagSet: []*s3.Tag{
+					{Key: aws.String(status), Value: aws.String(uploaded)},
+				},
 			},
-		}
-		_, err := ps.svc.PutObjectTagging(
-			&s3.PutObjectTaggingInput{
-				Bucket:  aws.String(bucket),
-				Key:     aws.String(metadataPath + assetID.String()),
-				Tagging: tags,
-			},
-		)
-		if err != nil {
-			if awsErr, ok := err.(awserr.RequestFailure); ok {
-				switch code := awsErr.StatusCode(); code {
-				case 404:
-					return auerr.FError(auerr.ErrorNotFound, "Asset %s is not found", assetID.String())
-				default:
-					return auerr.CError(auerr.ErrorInternalError, err)
-				}
+		},
+	)
+	if err != nil {
+		if awsErr, ok := err.(awserr.RequestFailure); ok {
+			switch code := awsErr.StatusCode(); code {
+			case 404:
+				return auerr.FError(auerr.ErrorNotFound, "Asset %s is not found", assetID.String())
+			default:
+				return auerr.CError(auerr.ErrorInternalError, err)
 			}
-			return auerr.CError(auerr.ErrorInternalError, err)
 		}
-
-		return nil
+		return auerr.CError(auerr.ErrorInternalError, err)
 	}
+
+	return nil
 }
 
 func (ps *s3AssetManager) GetURL(bucket string, assetID uuid.UUID, timeout int64) (*url.URL, error) {
@@ -175,7 +150,7 @@ func (ps *s3AssetManager) GetURL(bucket string, assetID uuid.UUID, timeout int64
 	req, _ := ps.svc.GetObjectRequest(
 		&s3.GetObjectInput{
 			Bucket: aws.String(bucket),
-			Key:    aws.String(assetID.String()),
+			Key:    aws.String(uploadedPath + assetID.String()),
 		})
 
 	getURLString, err := req.Presign(time.Duration(timeout) * time.Second)

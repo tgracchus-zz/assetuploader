@@ -57,7 +57,7 @@ func newPutAssetEndpoint(assetManager assets.AssetManager, bucket string) func(c
 		if err != nil {
 			return err
 		}
-		return c.JSON(http.StatusAccepted, &putAssetResponse{Status: "Accepted"})
+		return c.JSON(http.StatusOK, &putAssetResponse{Status: "Accepted"})
 	}
 }
 

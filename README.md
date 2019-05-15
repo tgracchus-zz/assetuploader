@@ -1,12 +1,12 @@
 # Asset uploader
 
-## How to:
 TODO
 Test, Run and Build info
 Add echo test
-Integration test
 Add bonus points to README
 review README
+
+## How to Build:
 
 ## Endpoints
 ### POST ​​/asset  
@@ -24,7 +24,7 @@ empty
 ```
 Response code | Description
 ------------ | -------------
-200 | Query succeed
+201 | Asset created
 500 | Internal Error
 
 
@@ -108,8 +108,15 @@ Response code | Description
 
 
 * **Technical Notes**:  
+This is the tricky endpoint:
 Since the user can put the asset again as long as the signed url is valid.
 We need to make sure we mark the correct file and it don´t get overwrited.  
+There is several approaches here:
+* Update status no matter if the put to s3 has expired or not.  
+This will allow the user to mark the file as completed, but it can be overwrited. From that point, beahviour might be unexpected depending of the implementation.  
+One example: the version marked as uploaded can get deleted by an overwrite, so, we will get a version which is not matching what the user marked as uploaded.  
+Another one: its marked as completed, we got the get link, then its overwrited. What happens now?
+
 For this reason,this endpoint schedule a task to mark the asset 
 once the expiration time as elapsed. 
 That explains the 201 and not a 200 as successful response code

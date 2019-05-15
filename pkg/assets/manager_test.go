@@ -63,7 +63,6 @@ func newTestUpdateIt(manager assets.AssetManager, bucket string) func(t *testing
 		if err != nil {
 			t.Fatal(err)
 		}
-		time.Sleep(5 * time.Second)
 		getUrl, err := manager.GetURL(bucket, assetId, 15)
 		if err != nil {
 			t.Fatal(err)
@@ -126,7 +125,6 @@ func newTestOverwrite(session *session.Session, bucket string, region string) fu
 		if err != nil {
 			t.Fatal(err)
 		}
-		time.Sleep(5 * time.Second)
 		getUrl, err := mamager.GetURL(bucket, assetId, 15)
 		if err != nil {
 			t.Fatal(err)
@@ -180,7 +178,7 @@ func newTestPutUrl(manager assets.AssetManager, bucket string, region string) fu
 		if putURL.Hostname() != expectedHostName {
 			t.Fatalf("Hostname should be %s, not %s", expectedHostName, putURL.Hostname())
 		}
-		expectedPath := "/" + assetId.String()
+		expectedPath := "/temp/" + assetId.String()
 		if putURL.Path != expectedPath {
 			t.Fatalf("Path should be %s, not %s", expectedPath, putURL.Path)
 		}
