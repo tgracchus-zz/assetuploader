@@ -1,4 +1,6 @@
 # Asset uploader
+
+## How to
 ### How to create distributions
 ```bash
 build/distribution.sh
@@ -72,7 +74,7 @@ S3 paths are no longer affected by prefixes.
 ## Endpoints
 ### POST ​​/asset  
 * **Description**:  
-Creates a new asset with a random uuid and returns a url to put the asset
+Creates a new asset with a random uuid and returns a url to put the asset in s3
 
 * **Body**:  
 empty  
@@ -86,10 +88,11 @@ empty
 Response code | Description
 ------------ | -------------
 201 | Asset id created
-500 | Internal Error
+500 | Internal Error  
+  
+* **Technical Notes**:  
 
-
-### PUT ​​/asset/<asset-id>**   
+  * **PUT ​​/asset/<asset-id>**   
 Since the 
 [S3 consistency model](https://docs.aws.amazon.com/AmazonS3/latest/dev/Introduction.html#ConsistencyModel
 )
@@ -159,35 +162,31 @@ Response code | Description
 202 | Query accepted
 400 | If the request is incorrect
 404 | If the asset id is not found
-500 | Internal Error
+500 | Internal Error  
 
 
 * **Technical Notes**:  
-This is the tricky endpoint since the user can put the asset again and again as long as the signed url is valid.  
+This is the tricky endpoint, since the user can put the asset again and again as long as the signed url is valid.  
 That esentially introduces the problem of marking the correct file and make sure it remains the same.
- 
 For this reason, I can foresee 3 approaches:  
-* Do it before expiration of the put request:  
-Imagine:
--> Post file1 to asset1-> Put /asset/asset1
-then, at the same time:
--> Post file2 to asset1 -> Put /asset/asset1
+  1. Do it before expiration of the put request:  
+  Imagine:  
+    -> Post file1 to asset1-> Put /asset/asset1  
+    then, at the same time:  
+    -> Post file2 to asset1 -> Put /asset/asset1    </p>
+    Given than s3 operations are atomic at file level:  
+    Queries will compete against each other and we will end up with a file marked as complete, 
+    but we are uncertain about if it is file1 or file2.   
+    So, the consistency model is weak in this case, not even eventual consistency
 
-Given than s3 operations are atomic at file level:  
-Queries will compete against each other and we will end up with a file marked as complete, 
-but we are uncertain about if it is file1 or file2. 
+  2. Do not allow the operation until the post is expired:  
+Hard limitation on the api, simple and effective solution which leads to a more strong consistency model.  
+It´s in fact still eventual consistency since tagging in s3 is eventual consistent (tags are used to mark an object as uploaded)  
+It also it delegates the problem since it keep the client trying to mark the file as uploaded
 
-So, the consistency model is weak in this case, not even eventual consistency
-
-* Do not allow the operation until the post is expired:  
-Hard limitation on the api, but, simple and efectivy solution which leads to a more strong consistency model, but, it´s in fact still eventual consistency since tagging in s3 is eventual consistent (tags are used to mark an object as uploaded)
-In fact, it delegates the probem since it keep the client trying to mark the file as uploaded
-
-* Schedule a task to mark the asset as uploaded after it is expired:
+  3. Schedule a task to mark the asset as uploaded after it is expired:
 Introduces the need for a queue or some kind of scheduling, it´s nicer for the client than option 2
-Also eventual consistency model.  
-
-I decided to go for the last approach.
+Also eventual consistency model. **I decided to go for the last approach.**
 
 ### GET ​​/asset/<asset-id>  
 * **Description:**   
