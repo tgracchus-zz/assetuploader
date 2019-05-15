@@ -63,6 +63,7 @@ func newTestUpdateIt(manager assets.AssetManager, bucket string) func(t *testing
 		if err != nil {
 			t.Fatal(err)
 		}
+		time.Sleep(5 * time.Second)
 		getUrl, err := manager.GetURL(bucket, assetId, 15)
 		if err != nil {
 			t.Fatal(err)
@@ -125,6 +126,7 @@ func newTestOverwrite(session *session.Session, bucket string, region string) fu
 		if err != nil {
 			t.Fatal(err)
 		}
+		time.Sleep(5 * time.Second)
 		getUrl, err := mamager.GetURL(bucket, assetId, 15)
 		if err != nil {
 			t.Fatal(err)
