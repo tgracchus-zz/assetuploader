@@ -17,7 +17,6 @@ func main() {
 	pflag.String("region", "us-west-2", "aws region")
 	pflag.String("bucket", "dmc-asset-uploader-test", "aws bucket")
 	viper.AutomaticEnv()
-	viper.BindPFlags(pflag.CommandLine)
 	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 	viper.BindPFlags(pflag.CommandLine)
 	pflag.Parse()

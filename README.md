@@ -1,13 +1,48 @@
 # Asset uploader
 
 TODO
-Test, Run and Build info
 Add echo test
-Add bonus points to README
 review README
 
-## How to Build:
+### How to create distributions
+```bash
+build/distribution.sh
+```
+In order to run it:  
+* Make sure to define  
+export AWS_ACCESS_KEY_ID=XXXXX  
+export AWS_SECRET_ACCESS_KEY=XXXXX  
 
+```bash
+./assetuploader-1.0-darwin-x86_64 --region=${AWS_REGION} --bucket=${AWS_BUCKET}
+```
+
+### How to Run inplace
+Make sure to define:  
+export AWS_ACCESS_KEY_ID=XXXXX  
+export AWS_SECRET_ACCESS_KEY=XXXXXX  
+export AWS_REGION=XXXXX  
+export AWS_BUCKET=XXXXX  
+Otherwise the scrip will fail.
+```bash
+build/run.sh
+```
+
+### How to Test
+```bash
+build/test.sh
+```
+
+### How to Integration Test
+Make sure to define:  
+export AWS_ACCESS_KEY_ID=XXXXX  
+export AWS_SECRET_ACCESS_KEY=XXXXXX  
+export AWS_REGION=XXXXX  
+export AWS_BUCKET=XXXXX  
+Otherwise the scrip will fail.
+```bash
+build/itest.sh
+```
 
 ## S3 schema
 Before explaining the actual endpoints it´s worth explaining the s3chema used in the app.  
@@ -179,6 +214,10 @@ This is done with a tag in the metadata object. Since tags are eventually consis
 it might take a bit longer after the object is marked as uploaded. But, since the ### PUT ​​/asset/<asset-id> 
 is async, it does not matter.
 
+
+## Bonus point
+Create a persistent SimpleScheduler, so if the instance goes down, we can still be able to resume the jobs. 
+
 ## Project Layout
 Following pkg, cmd and build patterns as seen here
 https://github.com/golang-standards/project-layout
@@ -190,7 +229,6 @@ https://golang.github.io/dep/
 
 ## AWS SDK
 https://docs.aws.amazon.com/sdk-for-go/api/service/s3/
-
 
 
 

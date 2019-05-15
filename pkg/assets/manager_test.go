@@ -21,8 +21,8 @@ import (
 
 // TestS3AssetManager requires to set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY env variables.
 func TestS3AssetManager(t *testing.T) {
-	bucket := os.Getenv("TEST_BUCKET")
-	region := os.Getenv("TEST_REGION")
+	bucket := os.Getenv("AWS_REGION")
+	region := os.Getenv("AWS_BUCKET")
 	credentials := credentials.NewEnvCredentials()
 	session, err := assets.NewAwsSession(credentials, region)
 	if err != nil {
