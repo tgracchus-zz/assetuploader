@@ -8,15 +8,16 @@ import (
 )
 
 // NewAwsSession creates a new AWS session from the given credentials.
-func NewAwsSession(cred *credentials.Credentials) (*session.Session, error) {
+func NewAwsSession(cred *credentials.Credentials, region string) (*session.Session, error) {
 	if cred == nil {
 		return nil, auerr.SError(auerr.ErrorBadInput, "Credentials are nil")
 	}
 	if *cred == emptyCredentials {
 		return nil, auerr.SError(auerr.ErrorBadInput, "Credentials are empty")
 	}
-	return session.Must(session.NewSession(
-		&aws.Config{
-			Credentials: cred,
-		})), nil
+	return session.Must(
+		session.NewSession(
+			aws.NewConfig().WithCredentials(cred).WithRegion(region),
+		),
+	), nil
 }

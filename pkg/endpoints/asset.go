@@ -28,7 +28,7 @@ func newPostAssetEndpoint(assetManager assets.AssetManager, bucket string) func(
 		if err != nil {
 			return err
 		}
-		return c.JSON(http.StatusOK, &postAssetResponse{UploadURL: url.String(), AssetID: assetID.String()})
+		return c.JSON(http.StatusCreated, &postAssetResponse{UploadURL: url.String(), AssetID: assetID.String()})
 	}
 }
 
