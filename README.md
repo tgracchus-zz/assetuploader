@@ -47,21 +47,22 @@ build/itest.sh
 ## S3 schema
 Before explaining the actual endpoints it´s worth explaining the s3chema used in the app.  
 
-bucket:  
-  -> metadata/{assetId}  
+bucket:    
   -> temp/{assetId}  
   -> uploaded/{assetId}  
 
-The main reason to separate the temp and the uploaded is to prevent the user to use the presigned put url for a get, since the only difference between both requests is the method.  
+Theres two reasons for this schema:
+1. Prevent the user to use the presigned put url for a get, since the only difference between both requests is the method.  
+2. Prevent the user to overwrite the files marked as uploaded
 
-* Post /assets/{assetId} => metadata file is created inside metadata/{assetId}  
+* Post /assets/{assetId} => placeholder file is created inside uploaded/{assetId}  
   the presigned url points to temp/, so the file will be uploaded to /temp.  
 
-* Put /assets/{assetId} =>  metata file is check for uploaded status.
-  * If not uploaded schedule a job which will copy de temp/{assetId} to uploaded/{assetId} and finally mark the metadata file as uploaded.
-  *  If job is expired, execute it now, otherwise, schedule it
-  * If uploaded: trow an error
-
+* Put /assets/{assetId} =>  placeholder file is check for uploaded status.
+  * If uploaded => trow an error
+  * If not uploaded => schedule a job which will copy de temp/{assetId} to uploaded/{assetId} and update tags to mark it as uploaded
+  * Schedule job
+  
 * When get /assets/{assetId} is called the metata file is check for uploaded status.
   * If not uploaded: generate the presigned url pointing to the uploaded/{assetId} file
   * If uploaded: trow an error
@@ -74,8 +75,8 @@ S3 paths are no longer affected by prefixes.
 ## Endpoints
 ### POST ​​/asset  
 * **Description**:  
-Creates a new asset with a random uuid and returns a url to put the asset in s3
-
+Creates a new asset with a random uuid and returns a url to put the asset in s3.
+It also adds a placeholder to final destination
 * **Body**:  
 empty  
 
@@ -97,7 +98,7 @@ Since the
 [S3 consistency model](https://docs.aws.amazon.com/AmazonS3/latest/dev/Introduction.html#ConsistencyModel
 )
 supports read-after-write consistency, that is (only): put and get same object.  
-When the PUT /asset/assetID checks that metadata, it should be ok to read.  
+When the PUT /asset/assetID checks that placeholder, it should be ok to read.  
 However, a malicious user can still try to auto generate uuids and query the api so we lose the 
 read-after-write consistency, because we will have a write-after-read -> eventual consistency.
  
@@ -207,7 +208,7 @@ Response code | Description
 
 * **Technical Notes:**  
 In the PUT ​​/asset/<asset-id> endpoint we mark the asset as completed. 
-This is done with a tag in the metadata object. Since tags are eventually consistent,
+This is done with a tag in the uploaded object. Since tags are eventually consistent,
 it might take a bit longer after the object is marked as uploaded. But, since the ### PUT ​​/asset/<asset-id> 
 is async, it does not matter.
 
