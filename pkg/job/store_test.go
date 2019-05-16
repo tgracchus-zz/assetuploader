@@ -35,6 +35,35 @@ func TestAddAndGetJob(t *testing.T) {
 	}
 }
 
+func TestGetBeforeCancelled(t *testing.T) {
+	_, query := job.NewMemoryStore(job.MillisKeys)
+	executionDate := time.Now()
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := job.GetBefore(ctx, query, executionDate, []job.Status{job.ErrorStatus})
+	if err == nil {
+		t.Fatal(err)
+	}
+	if err.Error() != "context canceled" {
+		t.Fatalf("We expect the context to be cancelled")
+	}
+}
+
+func TestUpsetCancelled(t *testing.T) {
+	upsert, _ := job.NewMemoryStore(job.MillisKeys)
+	executionDate := time.Now()
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	expectedJob := job.NewFixedDateJob(uuid.New().String(), testJobFunction, executionDate)
+	err := job.UpSert(ctx, upsert, *expectedJob)
+	if err == nil {
+		t.Fatal(err)
+	}
+	if err.Error() != "context canceled" {
+		t.Fatalf("We expect the context to be cancelled")
+	}
+}
+
 func TestUpdateJobStatus(t *testing.T) {
 	upsert, query := job.NewMemoryStore(job.MillisKeys)
 	executionDate := time.Now()

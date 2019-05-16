@@ -33,6 +33,25 @@ func TestScheduleJob(t *testing.T) {
 	}
 }
 
+func TestScheduleJobCancel(t *testing.T) {
+	upsert, query := job.NewMemoryStore(job.MillisKeys)
+	simpleScheduler := schedule.NewSimpleScheduler(upsert, query, 200*time.Millisecond)
+	executionDate := time.Now()
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	newJob := job.NewFixedDateJob(uuid.New().String(), jobCallBack, executionDate)
+	simpleScheduler.Schedule(ctx, *newJob)
+	// Need to wait for the first tick at least
+	time.Sleep(500 * time.Millisecond)
+	_, err := job.GetBefore(ctx, query, time.Now(), []job.Status{job.CompletedStatus})
+	if err == nil {
+		t.Fatal(err)
+	}
+	if err.Error() != "context canceled" {
+		t.Fatalf("We expect the context to be cancelled")
+	}
+}
+
 func TestScheduleJobFails(t *testing.T) {
 	upsert, query := job.NewMemoryStore(job.MillisKeys)
 	simpleScheduler := schedule.NewSimpleScheduler(upsert, query, 200*time.Millisecond)

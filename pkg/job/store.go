@@ -26,7 +26,12 @@ func NewMemoryStore(bucketKeyFunc BucketKeyFunc) (chan Job, chan StoreQuery) {
 				if !ok {
 					queries = nil
 				}
-				query.response <- jobs.getBefore(query)
+
+				jobs := jobs.getBefore(query)
+				err := query.ctx.Err()
+				if err == nil {
+					query.response <- jobs
+				}
 			}
 			if upSert == nil && queries == nil {
 				break
@@ -38,6 +43,9 @@ func NewMemoryStore(bucketKeyFunc BucketKeyFunc) (chan Job, chan StoreQuery) {
 
 // UpSert sends a job to the upset channel of a store.
 func UpSert(ctx context.Context, upSert chan Job, job Job) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
 	upSert <- job
 	return nil
 }
@@ -48,7 +56,7 @@ func GetBefore(ctx context.Context, queries chan StoreQuery, date time.Time, sta
 	for _, status := range statuses {
 		statusesMap[status] = true
 	}
-	query := StoreQuery{date: date, status: statusesMap, response: make(chan []Job)}
+	query := StoreQuery{ctx: ctx, date: date, status: statusesMap, response: make(chan []Job)}
 	defer close(query.response)
 	queries <- query
 	select {
@@ -64,6 +72,7 @@ func GetBefore(ctx context.Context, queries chan StoreQuery, date time.Time, sta
 
 // StoreQuery struct to query for jobs with status and with executionDate before date.
 type StoreQuery struct {
+	ctx      context.Context
 	date     time.Time
 	status   map[Status]bool
 	response chan []Job

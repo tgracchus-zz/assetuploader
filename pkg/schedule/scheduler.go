@@ -26,26 +26,44 @@ func (s *immediateScheduler) Schedule(ctx context.Context, job job.Job) error {
 
 // NewSimpleScheduler is a scheduler looking for new jobs every tickPeriod
 func NewSimpleScheduler(
-	upsert chan job.Job, query chan job.StoreQuery,
+	upsert chan job.Job, queries chan job.StoreQuery,
 	tickPeriod time.Duration,
 ) SimpleScheduler {
-	scheduler := &simpleScheduler{upsert: upsert, query: query}
+	scheduler := &simpleScheduler{upsert: upsert, queries: queries}
 	scheduler.tick(tickPeriod)
 	return scheduler
 }
 
 type simpleScheduler struct {
-	upsert chan job.Job
-	query  chan job.StoreQuery
+	upsert  chan job.Job
+	queries chan job.StoreQuery
 }
 
 func (s *simpleScheduler) Schedule(ctx context.Context, scheduledJob job.Job) error {
 	// if job is overdued, execute it now
 	if time.Now().Before(scheduledJob.ExecutionDate) {
+
 		s.execute(ctx, scheduledJob)
 		return nil
 	}
 	return job.UpSert(ctx, s.upsert, scheduledJob)
+}
+
+func (s *simpleScheduler) tick(checkTime time.Duration) {
+	ticker := time.NewTicker(checkTime)
+	go func() {
+		for range ticker.C {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			jobs, err := job.GetBefore(ctx, s.queries, time.Now(), []job.Status{job.NewStatus})
+			if err != nil {
+				log.Println(err.Error())
+			}
+			for _, job := range jobs {
+				s.execute(ctx, job)
+			}
+		}
+	}()
 }
 
 func (s *simpleScheduler) execute(ctx context.Context, scheduledJob job.Job) {
@@ -69,23 +87,4 @@ func (s *simpleScheduler) execute(ctx context.Context, scheduledJob job.Job) {
 			log.Println(err.Error())
 		}
 	}
-}
-
-func (s *simpleScheduler) tick(checkTime time.Duration) {
-	ticker := time.NewTicker(checkTime)
-	go func() {
-		for range ticker.C {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-			jobs, err := job.GetBefore(ctx, s.query, time.Now(), []job.Status{job.NewStatus})
-			if err != nil {
-				log.Println(err.Error())
-			}
-			for _, job := range jobs {
-				s.execute(ctx, job)
-
-			}
-		}
-	}()
-
 }
