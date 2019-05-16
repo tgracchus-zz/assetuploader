@@ -179,7 +179,7 @@ func (ps *s3AssetManager) checkIsUploaded(ctx context.Context, bucket string, pa
 			return tags, nil
 		}
 	}
-	return nil, auerr.FError(auerr.ErrorConflict, "Asset %s already uploaded", assetID.String())
+	return nil, auerr.FError(auerr.ErrorNotFound, "Can not find assetID %s with status uploaded", assetID.String())
 }
 
 func (ps *s3AssetManager) checkIsNotUploaded(ctx context.Context, bucket string, path string, assetID uuid.UUID) (map[string]*s3.Tag, error) {

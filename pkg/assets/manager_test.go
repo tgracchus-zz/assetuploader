@@ -8,12 +8,15 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/tgracchus/assetuploader/pkg/assets"
 	"github.com/tgracchus/assetuploader/pkg/auerr"
+	"github.com/tgracchus/assetuploader/pkg/job"
+	"github.com/tgracchus/assetuploader/pkg/schedule"
 )
 
 // TestS3AssetManager requires to set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY env variables.
@@ -26,7 +29,10 @@ func TestS3AssetManager(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	manager := assets.NewDefaultFileManager(session, region)
+	upsert, query := job.NewMemoryStore(job.MillisKeys)
+	expirationDuration := 1 * time.Second
+	scheduler := schedule.NewSimpleScheduler(upsert, query, expirationDuration)
+	manager := assets.News3AssetManager(session, region, scheduler, expirationDuration)
 	t.Run("TestUpdateIt", newTestUpdateIt(manager, bucket))
 	t.Run("TestOverwrite", newTestOverwrite(manager, bucket))
 	t.Run("TestUpdateItFileDoesNotExist", newTestUpdateItFileDoesNotExist(manager, bucket))
@@ -62,6 +68,7 @@ func newTestUpdateIt(manager assets.AssetManager, bucket string) func(t *testing
 		if err != nil {
 			t.Fatal(err)
 		}
+		time.Sleep(2 * time.Second)
 		getUrl, err := manager.GetURL(ctx, bucket, assetId, 15)
 		if err != nil {
 			t.Fatal(err)
@@ -117,6 +124,7 @@ func newTestOverwrite(manager assets.AssetManager, bucket string) func(t *testin
 		if err != nil {
 			t.Fatal(err)
 		}
+		time.Sleep(2 * time.Second)
 		getUrl, err := manager.GetURL(ctx, bucket, assetId, 15)
 		if err != nil {
 			t.Fatal(err)

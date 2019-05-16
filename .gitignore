@@ -2,3 +2,4 @@
 *.iml
 distributions/
 .vscode/
+cmd/assetuploader/assetuploader

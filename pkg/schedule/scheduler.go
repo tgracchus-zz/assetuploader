@@ -41,8 +41,7 @@ type simpleScheduler struct {
 
 func (s *simpleScheduler) Schedule(ctx context.Context, scheduledJob job.Job) error {
 	// if job is overdued, execute it now
-	if time.Now().Before(scheduledJob.ExecutionDate) {
-
+	if time.Now().After(scheduledJob.ExecutionDate) {
 		s.execute(ctx, scheduledJob)
 		return nil
 	}
