@@ -1,67 +1,72 @@
 package job
 
 import (
+	"context"
 	"time"
+
+	"github.com/tgracchus/assetuploader/pkg/auerr"
 )
 
-// NewStore instantiates a new store with the given store function.
-func NewStore(store Store) (chan Job, chan StoreQuery, chan []Job) {
+// NewMemoryStore instantiates a new store in memory storage.
+func NewMemoryStore(bucketKeyFunc BucketKeyFunc) (chan Job, chan StoreQuery) {
 	upSert := make(chan Job, 1000)
-	query := make(chan StoreQuery, 1000)
-	out := make(chan []Job, 1000)
-	store(upSert, query, out)
-	return upSert, query, out
+	queries := make(chan StoreQuery, 1000)
+	go func() {
+		defer close(upSert)
+		defer close(queries)
+		jobs := newTimeBuckets(bucketKeyFunc)
+		for {
+			select {
+			case job, ok := <-upSert:
+				if !ok {
+					upSert = nil
+				}
+				jobs.upsert(job)
+			case query, ok := <-queries:
+				if !ok {
+					queries = nil
+				}
+				query.response <- jobs.getBefore(query)
+			}
+			if upSert == nil && queries == nil {
+				break
+			}
+		}
+	}()
+	return upSert, queries
 }
 
 // UpSert sends a job to the upset channel of a store.
-func UpSert(upSert chan Job, job Job) error {
+func UpSert(ctx context.Context, upSert chan Job, job Job) error {
 	upSert <- job
 	return nil
 }
 
 // GetBefore ask for jobs whith status and with execution date before than the given one.
-func GetBefore(query chan StoreQuery, out chan []Job, date time.Time, statuses []Status) ([]Job, error) {
+func GetBefore(ctx context.Context, queries chan StoreQuery, date time.Time, statuses []Status) ([]Job, error) {
 	statusesMap := make(map[Status]bool)
 	for _, status := range statuses {
 		statusesMap[status] = true
 	}
-	query <- StoreQuery{date: date, status: statusesMap}
-	return <-out, nil
+	query := StoreQuery{date: date, status: statusesMap, response: make(chan []Job)}
+	defer close(query.response)
+	queries <- query
+	select {
+	case response, ok := <-query.response:
+		if !ok {
+			return nil, auerr.SError(auerr.ErrorInternalError, "Can not get jobs")
+		}
+		return response, nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
 }
 
 // StoreQuery struct to query for jobs with status and with executionDate before date.
 type StoreQuery struct {
-	date   time.Time
-	status map[Status]bool
-}
-
-// Store is a function for storing and look for jobs
-type Store func(upSert chan Job, query chan StoreQuery, storeQueryResult chan []Job)
-
-// NewMemoryStore creates an in memory Store using time buckets to classify jobs.
-func NewMemoryStore(bucketKeyFunc BucketKeyFunc) Store {
-	return func(upSert chan Job, query chan StoreQuery, storeQueryResult chan []Job) {
-		jobs := newTimeBuckets(bucketKeyFunc)
-		go func() {
-			for {
-				select {
-				case job, ok := <-upSert:
-					if !ok {
-						upSert = nil
-					}
-					jobs.upsert(job)
-				case get, ok := <-query:
-					if !ok {
-						query = nil
-					}
-					storeQueryResult <- jobs.getBefore(get)
-				}
-				if upSert == nil && query == nil {
-					break
-				}
-			}
-		}()
-	}
+	date     time.Time
+	status   map[Status]bool
+	response chan []Job
 }
 
 func newTimeBuckets(bucketKeyFunc BucketKeyFunc) *jobs {

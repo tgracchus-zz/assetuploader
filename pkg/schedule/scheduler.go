@@ -1,6 +1,7 @@
 package schedule
 
 import (
+	"context"
 	"log"
 	"time"
 
@@ -9,7 +10,7 @@ import (
 
 // SimpleScheduler is an scheduler for jobs.
 type SimpleScheduler interface {
-	Schedule(job job.Job) error
+	Schedule(ctx context.Context, job job.Job) error
 }
 
 type immediateScheduler struct {
@@ -19,52 +20,51 @@ type immediateScheduler struct {
 func NewImmediateScheduler() SimpleScheduler {
 	return &immediateScheduler{}
 }
-func (s *immediateScheduler) Schedule(job job.Job) error {
-	return job.Function()
+func (s *immediateScheduler) Schedule(ctx context.Context, job job.Job) error {
+	return job.Function(ctx)
 }
 
 // NewSimpleScheduler is a scheduler looking for new jobs every tickPeriod
 func NewSimpleScheduler(
-	upsert chan job.Job, query chan job.StoreQuery, response chan []job.Job,
+	upsert chan job.Job, query chan job.StoreQuery,
 	tickPeriod time.Duration,
 ) SimpleScheduler {
-	scheduler := &simpleScheduler{upsert: upsert, query: query, response: response}
+	scheduler := &simpleScheduler{upsert: upsert, query: query}
 	scheduler.tick(tickPeriod)
 	return scheduler
 }
 
 type simpleScheduler struct {
-	upsert   chan job.Job
-	query    chan job.StoreQuery
-	response chan []job.Job
+	upsert chan job.Job
+	query  chan job.StoreQuery
 }
 
-func (s *simpleScheduler) Schedule(scheduledJob job.Job) error {
+func (s *simpleScheduler) Schedule(ctx context.Context, scheduledJob job.Job) error {
 	// if job is overdued, execute it now
 	if time.Now().Before(scheduledJob.ExecutionDate) {
-		s.execute(scheduledJob)
+		s.execute(ctx, scheduledJob)
 		return nil
 	}
-	return job.UpSert(s.upsert, scheduledJob)
+	return job.UpSert(ctx, s.upsert, scheduledJob)
 }
 
-func (s *simpleScheduler) execute(scheduledJob job.Job) {
+func (s *simpleScheduler) execute(ctx context.Context, scheduledJob job.Job) {
 	scheduledJob = scheduledJob.Executing()
-	err := job.UpSert(s.upsert, scheduledJob)
+	err := job.UpSert(ctx, s.upsert, scheduledJob)
 	if err != nil {
 		log.Println(err.Error())
 	}
-	err = scheduledJob.Function()
+	err = scheduledJob.Function(ctx)
 	if err != nil {
 		log.Println(err.Error())
 		scheduledJob = scheduledJob.Error(err)
-		err = job.UpSert(s.upsert, scheduledJob)
+		err = job.UpSert(ctx, s.upsert, scheduledJob)
 		if err != nil {
 			log.Println(err.Error())
 		}
 	} else {
 		scheduledJob = scheduledJob.Completed()
-		err = job.UpSert(s.upsert, scheduledJob)
+		err = job.UpSert(ctx, s.upsert, scheduledJob)
 		if err != nil {
 			log.Println(err.Error())
 		}
@@ -75,13 +75,15 @@ func (s *simpleScheduler) tick(checkTime time.Duration) {
 	ticker := time.NewTicker(checkTime)
 	go func() {
 		for range ticker.C {
-			//TODO: look also for executing overdued jobs
-			jobs, err := job.GetBefore(s.query, s.response, time.Now(), []job.Status{job.NewStatus})
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			jobs, err := job.GetBefore(ctx, s.query, time.Now(), []job.Status{job.NewStatus})
 			if err != nil {
 				log.Println(err.Error())
 			}
 			for _, job := range jobs {
-				s.execute(job)
+				s.execute(ctx, job)
+
 			}
 		}
 	}()

@@ -2,6 +2,7 @@ package endpoints
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -255,12 +256,12 @@ type mockAssetManager struct {
 	getErr  error
 }
 
-func (mock *mockAssetManager) PutURL(bucket string, assetID uuid.UUID) (*url.URL, error) {
+func (mock *mockAssetManager) PutURL(ctx context.Context, bucket string, assetID uuid.UUID) (*url.URL, error) {
 	return mock.postURL, mock.postErr
 }
-func (mock *mockAssetManager) Uploaded(bucket string, assetID uuid.UUID) error {
+func (mock *mockAssetManager) Uploaded(ctx context.Context, bucket string, assetID uuid.UUID) error {
 	return mock.putErr
 }
-func (mock *mockAssetManager) GetURL(bucket string, assetID uuid.UUID, timeout int64) (*url.URL, error) {
+func (mock *mockAssetManager) GetURL(ctx context.Context, bucket string, assetID uuid.UUID, timeout int64) (*url.URL, error) {
 	return mock.getURL, mock.getErr
 }

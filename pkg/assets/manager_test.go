@@ -1,6 +1,7 @@
 package assets_test
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -39,7 +40,8 @@ func newTestUpdateIt(manager assets.AssetManager, bucket string) func(t *testing
 		if err != nil {
 			t.Fatal(err)
 		}
-		putUrl, err := manager.PutURL(bucket, assetId)
+		ctx := context.Background()
+		putUrl, err := manager.PutURL(ctx, bucket, assetId)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -56,11 +58,11 @@ func newTestUpdateIt(manager assets.AssetManager, bucket string) func(t *testing
 		if response.StatusCode != 200 {
 			t.Fatalf("Error put with code %d", response.StatusCode)
 		}
-		err = manager.Uploaded(bucket, assetId)
+		err = manager.Uploaded(ctx, bucket, assetId)
 		if err != nil {
 			t.Fatal(err)
 		}
-		getUrl, err := manager.GetURL(bucket, assetId, 15)
+		getUrl, err := manager.GetURL(ctx, bucket, assetId, 15)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -93,7 +95,8 @@ func newTestOverwrite(manager assets.AssetManager, bucket string) func(t *testin
 		if err != nil {
 			t.Fatal(err)
 		}
-		putURL, err := manager.PutURL(bucket, assetId)
+		ctx := context.Background()
+		putURL, err := manager.PutURL(ctx, bucket, assetId)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -110,11 +113,11 @@ func newTestOverwrite(manager assets.AssetManager, bucket string) func(t *testin
 		if response.StatusCode != 200 {
 			t.Fatalf("Error put with code %d", response.StatusCode)
 		}
-		err = manager.Uploaded(bucket, assetId)
+		err = manager.Uploaded(ctx, bucket, assetId)
 		if err != nil {
 			t.Fatal(err)
 		}
-		getUrl, err := manager.GetURL(bucket, assetId, 15)
+		getUrl, err := manager.GetURL(ctx, bucket, assetId, 15)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -146,7 +149,8 @@ func newTestUpdateItFileDoesNotExist(manager assets.AssetManager, bucket string)
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = manager.Uploaded(bucket, assetId)
+		ctx := context.Background()
+		err = manager.Uploaded(ctx, bucket, assetId)
 		if err == nil {
 			t.Fatal("We expected and error")
 		}
@@ -159,7 +163,8 @@ func newTestPutUrl(manager assets.AssetManager, bucket string, region string) fu
 		if err != nil {
 			t.Fatal(err)
 		}
-		putURL, err := manager.PutURL(bucket, assetId)
+		ctx := context.Background()
+		putURL, err := manager.PutURL(ctx, bucket, assetId)
 		if err != nil {
 			t.Fatal(err)
 		}

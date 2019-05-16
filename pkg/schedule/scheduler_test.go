@@ -1,6 +1,7 @@
 package schedule_test
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -11,15 +12,15 @@ import (
 )
 
 func TestScheduleJob(t *testing.T) {
-	upsert, query, responses := job.NewStore(job.NewMemoryStore(job.MillisKeys))
-	simpleScheduler := schedule.NewSimpleScheduler(upsert, query, responses, 200*time.Millisecond)
+	upsert, query := job.NewMemoryStore(job.MillisKeys)
+	simpleScheduler := schedule.NewSimpleScheduler(upsert, query, 200*time.Millisecond)
 	executionDate := time.Now()
-
+	ctx := context.Background()
 	newJob := job.NewFixedDateJob(uuid.New().String(), jobCallBack, executionDate)
-	simpleScheduler.Schedule(*newJob)
+	simpleScheduler.Schedule(ctx, *newJob)
 	// Need to wait for the first tick at least
 	time.Sleep(500 * time.Millisecond)
-	jobs, err := job.GetBefore(query, responses, time.Now(), []job.Status{job.CompletedStatus})
+	jobs, err := job.GetBefore(ctx, query, time.Now(), []job.Status{job.CompletedStatus})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,15 +34,15 @@ func TestScheduleJob(t *testing.T) {
 }
 
 func TestScheduleJobFails(t *testing.T) {
-	upsert, query, responses := job.NewStore(job.NewMemoryStore(job.MillisKeys))
-	simpleScheduler := schedule.NewSimpleScheduler(upsert, query, responses, 200*time.Millisecond)
+	upsert, query := job.NewMemoryStore(job.MillisKeys)
+	simpleScheduler := schedule.NewSimpleScheduler(upsert, query, 200*time.Millisecond)
 	executionDate := time.Now()
-
+	ctx := context.Background()
 	newJob := job.NewFixedDateJob(uuid.New().String(), errorCallBack, executionDate)
-	simpleScheduler.Schedule(*newJob)
+	simpleScheduler.Schedule(ctx, *newJob)
 	// Need to wait for the first tick at least
 	time.Sleep(500 * time.Millisecond)
-	jobs, err := job.GetBefore(query, responses, time.Now(), []job.Status{job.ErrorStatus})
+	jobs, err := job.GetBefore(ctx, query, time.Now(), []job.Status{job.ErrorStatus})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,10 +62,10 @@ func TestScheduleJobFails(t *testing.T) {
 
 }
 
-var jobCallBack = func() error {
+var jobCallBack = func(ctx context.Context) error {
 	return nil
 }
 
-var errorCallBack = func() error {
+var errorCallBack = func(ctx context.Context) error {
 	return errors.New("errorCallBack")
 }
