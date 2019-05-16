@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
 set -e
-go test `go list ./... | grep -v assets`
+go test -cover -race `go list ./... | grep -v assets`

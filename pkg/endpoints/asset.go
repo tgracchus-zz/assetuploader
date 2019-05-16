@@ -24,7 +24,7 @@ func RegisterAssetsEndpoints(e *echo.Echo, assetManager assets.AssetManager, buc
 func newPostAssetEndpoint(assetManager assets.AssetManager, bucket string) func(c echo.Context) error {
 	return func(c echo.Context) error {
 		assetID := uuid.New()
-		url, err := assetManager.PutURL(bucket, assetID)
+		url, err := assetManager.PutURL(c.Request().Context(), bucket, assetID)
 		if err != nil {
 			return err
 		}
@@ -53,7 +53,7 @@ func newPutAssetEndpoint(assetManager assets.AssetManager, bucket string) func(c
 			return auerr.FError(auerr.ErrorBadInput, "Expected status uploaded, not %s", statusUpdate.Status)
 		}
 
-		err = assetManager.Uploaded(bucket, assetID)
+		err = assetManager.Uploaded(c.Request().Context(), bucket, assetID)
 		if err != nil {
 			return err
 		}
@@ -83,7 +83,7 @@ func newGetAssetEndpoint(assetManager assets.AssetManager, bucket string) func(c
 		if err != nil {
 			return err
 		}
-		url, err := assetManager.GetURL(bucket, assetID, timeout)
+		url, err := assetManager.GetURL(c.Request().Context(), bucket, assetID, timeout)
 		if err != nil {
 			return err
 		}

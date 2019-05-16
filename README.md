@@ -47,24 +47,25 @@ build/itest.sh
 ## S3 schema
 Before explaining the actual endpoints it´s worth explaining the s3chema used in the app.  
 
-bucket:  
-  -> metadata/{assetId}  
+bucket:    
   -> temp/{assetId}  
   -> uploaded/{assetId}  
 
-The main reason to separate the temp and the uploaded is to prevent the user to use the presigned put url for a get, since the only difference between both requests is the method.  
+Theres two reasons for this schema:
+1. Prevent the user to use the presigned put url for a get before it´s marked as uploaded, since the only difference between both requests is the method.  
+2. Prevent the user to overwrite the files marked as uploaded
 
-* Post /assets/{assetId} => metadata file is created inside metadata/{assetId}  
-  the presigned url points to temp/, so the file will be uploaded to /temp.  
+So, this is the usual flow:
+* Post /assets/{assetId} => placeholder file is created inside uploaded/{assetId} with url expiration time
+  The presigned url points to /temp, so the file will be uploaded to /temp.  
 
-* Put /assets/{assetId} =>  metata file is check for uploaded status.
-  * If not uploaded schedule a job which will copy de temp/{assetId} to uploaded/{assetId} and finally mark the metadata file as uploaded.
-  *  If job is expired, execute it now, otherwise, schedule it
-  * If uploaded: trow an error
-
+* Put /assets/{assetId} =>  placeholder file is check for uploaded status.
+  * If uploaded => trow an error, already uploaded
+  * If not uploaded => schedule a job, to be executed after url expiration, using the url expiration time in the placeholder. That job will copy the temp/{assetId} to uploaded/{assetId} and update tags to mark it as uploaded.
+  
 * When get /assets/{assetId} is called the metata file is check for uploaded status.
-  * If not uploaded: generate the presigned url pointing to the uploaded/{assetId} file
-  * If uploaded: trow an error
+  * If uploaded: generate the presigned url pointing to the uploaded/{assetId} file
+  * If not uploaded: trow an error
 
 
 Note:  
@@ -74,8 +75,8 @@ S3 paths are no longer affected by prefixes.
 ## Endpoints
 ### POST ​​/asset  
 * **Description**:  
-Creates a new asset with a random uuid and returns a url to put the asset in s3
-
+Creates a new asset with a random uuid and returns a url to put the asset in s3.
+It also adds a placeholder to final destination
 * **Body**:  
 empty  
 
@@ -97,7 +98,7 @@ Since the
 [S3 consistency model](https://docs.aws.amazon.com/AmazonS3/latest/dev/Introduction.html#ConsistencyModel
 )
 supports read-after-write consistency, that is (only): put and get same object.  
-When the PUT /asset/assetID checks that metadata, it should be ok to read.  
+When the PUT /asset/assetID checks that placeholder, it should be ok to read.  
 However, a malicious user can still try to auto generate uuids and query the api so we lose the 
 read-after-write consistency, because we will have a write-after-read -> eventual consistency.
  
@@ -167,8 +168,8 @@ Response code | Description
 
 * **Technical Notes**:  
 This is the tricky endpoint, since the user can put the asset again and again as long as the signed url is valid.  
-That esentially introduces the problem of marking the correct file and make sure it remains the same.
-For this reason, I can foresee 3 approaches:  
+That esentially introduces the problem of marking as uploaded the correct file and make sure it remains the same.
+For this reason, I can foresee 4 approaches:  
   1. Do it before expiration of the put request:  
   Imagine:  
     -> Post file1 to asset1-> Put /asset/asset1  
@@ -184,9 +185,11 @@ Hard limitation on the api, simple and effective solution which leads to a more 
 It´s in fact still eventual consistency since tagging in s3 is eventual consistent (tags are used to mark an object as uploaded)  
 It also it delegates the problem since it keep the client trying to mark the file as uploaded
 
-  3. Schedule a task to mark the asset as uploaded after it is expired:
-Introduces the need for a queue or some kind of scheduling, it´s nicer for the client than option 2
-Also eventual consistency model. **I decided to go for the last approach.**
+  3. Try to get a lock in the object, using a distributed lock for updating it. This solution provides a more consistent 
+  solution but it prevents to user to progress if the request fail to get the lock.
+
+  4. Schedule a task to mark the asset as uploaded after the pregisned put url is expired:
+  Introduces the need for a queue or some kind of scheduling. Eventual consistency model, but, to me it provides the nicest user experience, so: **I decided to go for the last approach.**
 
 ### GET ​​/asset/<asset-id>  
 * **Description:**   
@@ -207,13 +210,21 @@ Response code | Description
 
 * **Technical Notes:**  
 In the PUT ​​/asset/<asset-id> endpoint we mark the asset as completed. 
-This is done with a tag in the metadata object. Since tags are eventually consistent,
+This is done with a tag in the uploaded object. Since tags are eventually consistent,
 it might take a bit longer after the object is marked as uploaded. But, since the ### PUT ​​/asset/<asset-id> 
 is async, it does not matter.
 
 
+## Solution concurreny model.
+- Post, S3 Put, Put Completed => ok  
+- Post, S3 Put, Put Completed,Put Completed => ok => Put is idempotent
+- Post, S3 Put, Put Completed, S3 Put, Put Completed => ok => Will pick second s3 put given s3 converged (its eventual consistent in this case)  
+- Post, S3 Put, Put Completed, S3 Put => => ok => Will pick second s3 put given s3 converged (its eventual consistent in this case)  
+- Post, S3 Put, Put Completed, S3 Put, Put Completed
+
 ## Bonus point
-Create a persistent SimpleScheduler, so if the instance goes down, we can still be able to resume the jobs. 
+- Create a persistent SimpleScheduler, so if the instance goes down, we can still be able to resume the jobs. 
+
 
 ## Project Layout
 Following pkg, cmd and build patterns as seen here

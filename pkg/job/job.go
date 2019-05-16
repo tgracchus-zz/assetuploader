@@ -1,6 +1,9 @@
 package job
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 // NewFixedDateJob creates a new job with a fixed execution date.
 func NewFixedDateJob(id string, jobFunction Function, executionDate time.Time) *Job {
@@ -77,4 +80,4 @@ func (j *Job) copy(status Status, statusMsg string) Job {
 }
 
 // Function is the function attached to a given job, if it returns and error, the job will marked with an Error status.
-type Function func() error
+type Function func(ctx context.Context) error
