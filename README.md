@@ -220,7 +220,6 @@ is async, it does not matter.
 - Post, S3 Put, Put Completed,Put Completed => ok => Put is idempotent
 - Post, S3 Put, Put Completed, S3 Put, Put Completed => ok => Will pick second s3 put given s3 converged (its eventual consistent in this case)  
 - Post, S3 Put, Put Completed, S3 Put => => ok => Will pick second s3 put given s3 converged (its eventual consistent in this case)  
-- Post, S3 Put, Put Completed, S3 Put, Put Completed
 
 ## Bonus point
 - Create a persistent SimpleScheduler, so if the instance goes down, we can still be able to resume the jobs. 
