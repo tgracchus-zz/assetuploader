@@ -11,10 +11,10 @@ import (
 func NewMemoryStore(bucketKeyFunc BucketKeyFunc) (chan Job, chan StoreQuery) {
 	upSert := make(chan Job, 1000)
 	queries := make(chan StoreQuery, 1000)
+	jobs := newTimeBuckets(bucketKeyFunc)
 	go func() {
 		defer close(upSert)
 		defer close(queries)
-		jobs := newTimeBuckets(bucketKeyFunc)
 		for {
 			select {
 			case job, ok := <-upSert:
@@ -26,15 +26,14 @@ func NewMemoryStore(bucketKeyFunc BucketKeyFunc) (chan Job, chan StoreQuery) {
 				if !ok {
 					queries = nil
 				}
-
 				jobs := jobs.findBucketsBefore(query)
 				err := query.ctx.Err()
 				if err == nil {
 					query.response <- jobs
 				}
 			}
-			if upSert == nil && queries == nil {
-				break
+			if upSert == nil || queries == nil {
+				panic("Upsert or queries closes")
 			}
 		}
 	}()

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"testing"
@@ -19,6 +20,12 @@ import (
 	"github.com/tgracchus/assetuploader/pkg/schedule"
 )
 
+var expirationDuration = 5 * time.Second
+var tickPeriod = 500 * time.Millisecond
+
+var waitTimeout = 5 * time.Second
+var waitTime = 1 * time.Second
+
 // TestS3AssetManager requires to set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY env variables.
 func TestS3AssetManager(t *testing.T) {
 	region := os.Getenv("AWS_REGION")
@@ -30,8 +37,8 @@ func TestS3AssetManager(t *testing.T) {
 	}
 
 	upsert, query := job.NewMemoryStore(job.MillisKeys)
-	expirationDuration := 2 * time.Second
-	scheduler := schedule.NewSimpleScheduler(upsert, query, expirationDuration)
+
+	scheduler := schedule.NewSimpleScheduler(upsert, query, tickPeriod)
 	manager := assets.News3AssetManager(session, region, scheduler, expirationDuration)
 	t.Run("TestUpdateIt", newTestUpdateIt(manager, bucket))
 	t.Run("TestOverwrite", newTestOverwrite(manager, bucket))
@@ -68,11 +75,7 @@ func newTestUpdateIt(manager assets.AssetManager, bucket string) func(t *testing
 		if err != nil {
 			t.Fatal(err)
 		}
-		time.Sleep(3 * time.Second)
-		getUrl, err := manager.GetURL(ctx, bucket, assetId, 15)
-		if err != nil {
-			t.Fatal(err)
-		}
+		getUrl := waitForGet(ctx, t, manager, bucket, assetId)
 		req, err = http.NewRequest("GET", getUrl.String(), nil)
 		if err != nil {
 			fmt.Println("error creating request", getUrl.String())
@@ -125,11 +128,7 @@ func newTestOverwrite(manager assets.AssetManager, bucket string) func(t *testin
 		if err != nil {
 			t.Fatal(err)
 		}
-		time.Sleep(3 * time.Second)
-		getUrl, err := manager.GetURL(ctx, bucket, assetId, 15)
-		if err != nil {
-			t.Fatal(err)
-		}
+		getUrl := waitForGet(ctx, t, manager, bucket, assetId)
 		req, err = http.NewRequest("GET", getUrl.String(), nil)
 		if err != nil {
 			fmt.Println("error creating request", getUrl.String())
@@ -207,5 +206,51 @@ func TestSessionNilCredentials(t *testing.T) {
 	case auerr.ErrorBadInput:
 	default:
 		t.Fatalf("We are expected an auerrors.AUError")
+	}
+}
+
+func waitForGet(ctx context.Context, t *testing.T, manager assets.AssetManager, bucket string, assetId uuid.UUID) *url.URL {
+	var getUrl *url.URL = nil
+	var err error
+	ok := waitAndRetryWithTimeout(
+		func() bool {
+			getUrl, err = manager.GetURL(ctx, bucket, assetId, 15)
+			if err != nil {
+				switch code := errors.Cause(err).Error(); code {
+				case auerr.ErrorNotFound:
+					return false
+				default:
+					t.Fatal(err)
+				}
+			}
+			return true
+		},
+		waitTime,
+		waitTimeout,
+	)
+	if !ok {
+		t.Fatal("Get Timeout")
+	}
+	return getUrl
+}
+
+func waitAndRetryWithTimeout(action func() bool, waitTime time.Duration, timeout time.Duration) bool {
+	c := make(chan bool)
+	defer close(c)
+	actionAndClose := func() {
+		c <- action()
+	}
+	go actionAndClose()
+	for {
+		select {
+		case ok := <-c:
+			if ok {
+				return true // completed normally
+			}
+			time.Sleep(waitTime)
+			go actionAndClose()
+		case <-time.After(timeout):
+			return false // timed out
+		}
 	}
 }

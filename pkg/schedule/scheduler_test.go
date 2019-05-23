@@ -12,15 +12,24 @@ import (
 	"github.com/tgracchus/assetuploader/pkg/schedule"
 )
 
+var tickPeriod = 200 * time.Millisecond
+var jobTimeout = 500 * time.Millisecond
+
 func TestScheduleJob(t *testing.T) {
 	upsert, query := job.NewMemoryStore(job.MillisKeys)
-	simpleScheduler := schedule.NewSimpleScheduler(upsert, query, 200*time.Millisecond)
+	simpleScheduler := schedule.NewSimpleScheduler(upsert, query, tickPeriod)
 	executionDate := time.Now()
 	ctx := context.Background()
-	newJob := job.NewFixedDateJob(uuid.New().String(), jobCallBack, executionDate)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	callback := newJobCallBack(&wg)
+	newJob := job.NewFixedDateJob(uuid.New().String(), callback, executionDate)
 	simpleScheduler.Schedule(ctx, *newJob)
 	// Need to wait for the first tick at least
-	time.Sleep(500 * time.Millisecond)
+	jobExecuted := waitTimeout(&wg, jobTimeout)
+	if !jobExecuted {
+		t.Fatal("We expect the job to be executed")
+	}
 	jobs, err := job.GetBefore(ctx, query, time.Now(), newSchedulerTestCriteria(job.CompletedStatus))
 	if err != nil {
 		t.Fatal(err)
@@ -36,14 +45,15 @@ func TestScheduleJob(t *testing.T) {
 
 func TestScheduleJobCancel(t *testing.T) {
 	upsert, query := job.NewMemoryStore(job.MillisKeys)
-	simpleScheduler := schedule.NewSimpleScheduler(upsert, query, 200*time.Millisecond)
+	simpleScheduler := schedule.NewSimpleScheduler(upsert, query, tickPeriod)
 	executionDate := time.Now()
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	newJob := job.NewFixedDateJob(uuid.New().String(), jobCallBack, executionDate)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	callback := newJobCallBack(&wg)
+	newJob := job.NewFixedDateJob(uuid.New().String(), callback, executionDate)
 	simpleScheduler.Schedule(ctx, *newJob)
-	// Need to wait for the first tick at least
-	time.Sleep(500 * time.Millisecond)
 	_, err := job.GetBefore(ctx, query, time.Now(), newSchedulerTestCriteria(job.CompletedStatus))
 	if err == nil {
 		t.Fatal(err)
@@ -54,13 +64,19 @@ func TestScheduleJobCancel(t *testing.T) {
 }
 func TestScheduleJobFails(t *testing.T) {
 	upsert, query := job.NewMemoryStore(job.MillisKeys)
-	simpleScheduler := schedule.NewSimpleScheduler(upsert, query, 200*time.Millisecond)
+	simpleScheduler := schedule.NewSimpleScheduler(upsert, query, tickPeriod)
 	executionDate := time.Now()
 	ctx := context.Background()
-	newJob := job.NewFixedDateJob(uuid.New().String(), errorCallBack, executionDate)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	callback := newErrorCallBack(&wg)
+	newJob := job.NewFixedDateJob(uuid.New().String(), callback, executionDate)
 	simpleScheduler.Schedule(ctx, *newJob)
 	// Need to wait for the first tick at least
-	time.Sleep(500 * time.Millisecond)
+	jobExecuted := waitTimeout(&wg, jobTimeout)
+	if !jobExecuted {
+		t.Fatal("We expect the job to be executed")
+	}
 	jobs, err := job.GetBefore(ctx, query, time.Now(), newSchedulerTestCriteria(job.ErrorStatus))
 	if err != nil {
 		t.Fatal(err)
@@ -88,16 +104,13 @@ func TestExecutedOverduedJob(t *testing.T) {
 	jobExecuted := false
 	var wg sync.WaitGroup
 	wg.Add(1)
-	callback := func(ctx context.Context) error {
-		wg.Done()
-		return nil
-	}
+	callback := newJobCallBack(&wg)
 	executionDate := time.Now().Add(tick * -2)
 	fixedDateJob := job.NewFixedDateJob(uuid.New().String(), callback, executionDate)
 	overduedJob := fixedDateJob.Executing()
 	simpleScheduler.Schedule(ctx, overduedJob)
 	// Need to wait for the first tick at least
-	jobExecuted = waitTimeout(&wg, 2*time.Second)
+	jobExecuted = waitTimeout(&wg, jobTimeout)
 	if !jobExecuted {
 		t.Fatal("We expect the job to be executed")
 	}
@@ -111,18 +124,25 @@ func waitTimeout(wg *sync.WaitGroup, timeout time.Duration) bool {
 	}()
 	select {
 	case <-c:
+		time.Sleep(timeout)
 		return true // completed normally
 	case <-time.After(timeout):
 		return false // timed out
 	}
 }
 
-var jobCallBack = func(ctx context.Context) error {
-	return nil
+func newJobCallBack(wg *sync.WaitGroup) func(ctx context.Context) error {
+	return func(ctx context.Context) error {
+		wg.Done()
+		return nil
+	}
 }
 
-var errorCallBack = func(ctx context.Context) error {
-	return errors.New("errorCallBack")
+func newErrorCallBack(wg *sync.WaitGroup) func(ctx context.Context) error {
+	return func(ctx context.Context) error {
+		wg.Done()
+		return errors.New("errorCallBack")
+	}
 }
 
 func newSchedulerTestCriteria(status job.Status) func(job job.Job) bool {
