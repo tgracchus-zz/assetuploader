@@ -27,10 +27,13 @@ func NewMemoryStore(bucketKeyFunc BucketKeyFunc) (chan Job, chan StoreQuery) {
 					queries = nil
 				}
 				jobs := jobs.findBucketsBefore(query)
-				err := query.ctx.Err()
-				if err == nil {
+				select {
+				case <-query.ctx.Done():
+					//Do nothing channel context is aborted
+				default:
 					query.response <- jobs
 				}
+
 			}
 			if upSert == nil || queries == nil {
 				panic("Upsert or queries closes")
@@ -42,10 +45,12 @@ func NewMemoryStore(bucketKeyFunc BucketKeyFunc) (chan Job, chan StoreQuery) {
 
 // UpSert sends a job to the upset channel of a store.
 func UpSert(ctx context.Context, upSert chan Job, job Job) error {
-	if ctx.Err() != nil {
+	select {
+	case <-ctx.Done():
 		return ctx.Err()
+	default:
+		upSert <- job
 	}
-	upSert <- job
 	return nil
 }
 
