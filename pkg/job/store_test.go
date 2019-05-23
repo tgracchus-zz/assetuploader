@@ -2,11 +2,13 @@ package job_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/tgracchus/assetuploader/pkg/job"
+	"github.com/tgracchus/assetuploader/pkg/util"
 )
 
 var jobTimeout = 500 * time.Millisecond
@@ -26,21 +28,19 @@ func TestAddAndGetJob(t *testing.T) {
 		t.Fatal(err)
 	}
 	var jobs []job.Job
-	ok := waitAndRetryWithTimeout(func() bool {
+	err = util.WaitUntilWithContext(ctx, func(ctx context.Context) error {
 		jobs, err = job.GetBefore(ctx, query, executionDate, newStoreTestCriteria(expectedJob.Status))
 		if err != nil {
-			t.Fatal(err)
+			return err
 		}
 		if len(jobs) != 1 {
-			return false
+			return errors.New("Expected at least one job")
 		}
-		return true
+		return nil
 	}, waitTime, jobTimeout)
-
-	if !ok {
-		t.Fatal("Expected at least one job")
+	if err != nil {
+		t.Fatal(err)
 	}
-
 	if jobs[0].ID != expectedJob.ID {
 		t.Fatal("Expected job and actual job do not match")
 	}
@@ -85,19 +85,20 @@ func TestUpdateJobStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 	var foundJobs []job.Job
-	ok := waitAndRetryWithTimeout(func() bool {
+	err = util.WaitUntilWithContext(ctx, func(ctx context.Context) error {
 		foundJobs, err = job.GetBefore(ctx, query, executionDate, newStoreTestCriteria(newJob.Status))
 		if err != nil {
-			t.Fatal(err)
+			return err
 		}
-
 		if len(foundJobs) != 1 {
-			return false
+			return errors.New("Expected at least one job")
 		}
-		return true
+		return nil
 	}, waitTime, jobTimeout)
-
-	if !ok {
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(foundJobs) != 1 {
 		t.Fatal("Expected at least one job")
 	}
 
@@ -107,21 +108,19 @@ func TestUpdateJobStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 	var updatedFoundJobs []job.Job
-	ok = waitAndRetryWithTimeout(func() bool {
+	err = util.WaitUntilWithContext(ctx, func(ctx context.Context) error {
 		updatedFoundJobs, err = job.GetBefore(ctx, query, executionDate, newStoreTestCriteria(updatedJob.Status))
 		if err != nil {
-			t.Fatal(err)
+			return err
 		}
 		if len(updatedFoundJobs) != 1 {
-			return false
+			return errors.New("Expected at least one job")
 		}
-		return true
+		return nil
 	}, waitTime, jobTimeout)
-
-	if !ok {
-		t.Fatal("Expected at least one job")
+	if err != nil {
+		t.Fatal(err)
 	}
-
 	foundJob := foundJobs[0]
 	if foundJob.ID != newJob.ID {
 		t.Fatal("Expected job and actual job do not match")
@@ -169,19 +168,18 @@ func TestAddJobPastInTime(t *testing.T) {
 	// Since JobStore follows PRAM consistency model,
 	// we need to wait for the add channel to be drained, so we can observe the two jobs
 	var foundJobs []job.Job
-	ok := waitAndRetryWithTimeout(func() bool {
+	err = util.WaitUntilWithContext(ctx, func(ctx context.Context) error {
 		foundJobs, err = job.GetBefore(ctx, query, now, newStoreTestCriteria(newJob.Status))
 		if err != nil {
-			t.Fatal(err)
+			return err
 		}
 		if len(foundJobs) != 2 {
-			return false
+			return errors.New("Expected at least two jobs")
 		}
-		return true
+		return nil
 	}, waitTime, jobTimeout)
-
-	if !ok {
-		t.Fatal("Expected at least two jobs")
+	if err != nil {
+		t.Fatal(err)
 	}
 	foundJob := foundJobs[0]
 	if newJob.ID != foundJob.ID {
@@ -192,26 +190,5 @@ func TestAddJobPastInTime(t *testing.T) {
 func newStoreTestCriteria(status job.Status) func(job job.Job) bool {
 	return func(job job.Job) bool {
 		return job.Status == status
-	}
-}
-
-func waitAndRetryWithTimeout(action func() bool, waitTime time.Duration, timeout time.Duration) bool {
-	c := make(chan bool)
-	defer close(c)
-	actionAndClose := func() {
-		c <- action()
-	}
-	go actionAndClose()
-	for {
-		select {
-		case ok := <-c:
-			if ok {
-				return true // completed normally
-			}
-			time.Sleep(waitTime)
-			go actionAndClose()
-		case <-time.After(timeout):
-			return false // timed out
-		}
 	}
 }

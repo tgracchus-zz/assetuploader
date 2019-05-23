@@ -2,6 +2,9 @@ language: go
 go:
 - '1.11'
 script: build/itest.sh
+branches:
+  only:
+  - master
 deploy:
   skip_cleanup: true
   provider: script
