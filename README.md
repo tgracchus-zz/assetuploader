@@ -14,7 +14,7 @@ export AWS_SECRET_ACCESS_KEY=XXXXX
 ./assetuploader-1.0-darwin-x86_64 --region=${AWS_REGION} --bucket=${AWS_BUCKET}
 ```
 
-### How to Run inplace
+### How to run in-place
 * Make sure to define:  
 export AWS_ACCESS_KEY_ID=XXXXX  
 export AWS_SECRET_ACCESS_KEY=XXXXXX  
@@ -26,13 +26,13 @@ Otherwise the scrip will fail.
 build/run.sh
 ```
 
-### How to Test
+### How to run Test
 * Run  
 ```bash
 build/test.sh
 ```
 
-### How to Integration Test
+### How to run Integration Test
 * Make sure to define:    
 export AWS_ACCESS_KEY_ID=XXXXX  
 export AWS_SECRET_ACCESS_KEY=XXXXXX  
@@ -44,27 +44,27 @@ Otherwise the scrip will fail.
 build/itest.sh
 ```
 
-## S3 schema
+## S3 file schema
 Before explaining the actual endpoints it´s worth explaining the s3chema used in the app.  
 
 bucket:    
-  -> temp/{assetId}  
-  -> uploaded/{assetId}  
+  -> temp/{assetID}  
+  -> uploaded/{assetIDD}  
 
 Theres two reasons for this schema:
 1. Prevent the user to use the presigned put url for a get before it´s marked as uploaded, since the only difference between both requests is the method.  
 2. Prevent the user to overwrite the files marked as uploaded
 
 So, this is the usual flow:
-* Post /assets/{assetId} => placeholder file is created inside uploaded/{assetId} with url expiration time
+* Post /assets/{assetID} => placeholder file is created inside uploaded/{assetID} with url expiration time
   The presigned url points to /temp, so the file will be uploaded to /temp.  
 
-* Put /assets/{assetId} =>  placeholder file is check for uploaded status.
+* Put /assets/{assetID} =>  placeholder file is check for uploaded status.
   * If uploaded => trow an error, already uploaded
-  * If not uploaded => schedule a job, to be executed after url expiration, using the url expiration time in the placeholder. That job will copy the temp/{assetId} to uploaded/{assetId} and update tags to mark it as uploaded.
+  * If not uploaded => schedule a job, to be executed after url expiration, using the url expiration time in the placeholder. That job will copy the temp/{assetID} to uploaded/{assetID} and update tags to mark it as uploaded.
   
-* When get /assets/{assetId} is called the metata file is check for uploaded status.
-  * If uploaded: generate the presigned url pointing to the uploaded/{assetId} file
+* When get /assets/{assetID} is called the metata file is check for uploaded status.
+  * If uploaded: generate the presigned url pointing to the uploaded/{assetID} file
   * If not uploaded: trow an error
 
 
@@ -106,7 +106,7 @@ read-after-write consistency, because we will have a write-after-read -> eventua
   The original problem statement ask for a url which can be used by a post directly to s3.
   Even a post query can be made to s3, it´s intended for [browser upload.](https://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-authentication-HTTPPOST.html)
    
-    So, when trying to do a post to a bucket/assetId with query params auth, it fails:
+    So, when trying to do a post to a bucket/assetID with query params auth, it fails:
   ```bash
      https://assertuploader.s3.eu-west-1.amazonaws.com/a79b143e-6218-450b-a8e8-18d00d788b8b?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIASWEEC46WNIHR44WH%2F20190510%2Feu-west-1%2Fs3%2Faws4_request&X-Amz-Date=20190510T204051Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Signature=3df259f4cacbf54a157673c67b285b71ff28ae3d01df52b59d203c9af01fba59
   ```

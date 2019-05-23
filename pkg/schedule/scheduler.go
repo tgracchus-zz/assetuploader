@@ -29,43 +29,48 @@ func NewSimpleScheduler(
 	upsert chan job.Job, queries chan job.StoreQuery,
 	tickPeriod time.Duration,
 ) SimpleScheduler {
-	scheduler := &simpleScheduler{upsert: upsert, queries: queries}
-	scheduler.tick(tickPeriod)
+	scheduler := &simpleScheduler{upsert: upsert, queries: queries, tickPeriod: tickPeriod}
+	scheduler.executionLoop()
 	return scheduler
 }
 
 type simpleScheduler struct {
-	upsert  chan job.Job
-	queries chan job.StoreQuery
+	upsert     chan job.Job
+	queries    chan job.StoreQuery
+	tickPeriod time.Duration
 }
 
 func (s *simpleScheduler) Schedule(ctx context.Context, scheduledJob job.Job) error {
-	// if job is overdued, execute it now
-	if time.Now().After(scheduledJob.ExecutionDate) {
-		s.execute(ctx, scheduledJob)
-		return nil
-	}
 	return job.UpSert(ctx, s.upsert, scheduledJob)
 }
 
-func (s *simpleScheduler) tick(checkTime time.Duration) {
-	ticker := time.NewTicker(checkTime)
+func (s *simpleScheduler) executionLoop() {
+	ticker := time.NewTicker(s.tickPeriod)
 	go func() {
 		for range ticker.C {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-			jobs, err := job.GetBefore(ctx, s.queries, time.Now(), []job.Status{job.NewStatus})
-			if err != nil {
-				log.Println(err.Error())
-			}
-			for _, job := range jobs {
-				s.execute(ctx, job)
-			}
+			s.executeJobs()
 		}
 	}()
 }
 
-func (s *simpleScheduler) execute(ctx context.Context, scheduledJob job.Job) {
+func (s *simpleScheduler) executeJobs() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	jobs, err := job.GetBefore(ctx, s.queries, time.Now(), func(job job.Job) bool {
+		overdued := job.ExecutionDate.Add(s.tickPeriod * time.Duration(2))
+		return job.IsNew() || (job.IsExecuting() && time.Now().After(overdued))
+	})
+	if err != nil {
+		log.Println(err.Error())
+	}
+	if jobs != nil {
+		for _, jobUnit := range jobs {
+			s.executeJob(ctx, jobUnit)
+		}
+	}
+}
+
+func (s *simpleScheduler) executeJob(ctx context.Context, scheduledJob job.Job) {
 	scheduledJob = scheduledJob.Executing()
 	err := job.UpSert(ctx, s.upsert, scheduledJob)
 	if err != nil {

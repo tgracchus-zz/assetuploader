@@ -11,10 +11,10 @@ import (
 func NewMemoryStore(bucketKeyFunc BucketKeyFunc) (chan Job, chan StoreQuery) {
 	upSert := make(chan Job, 1000)
 	queries := make(chan StoreQuery, 1000)
+	jobs := newTimeBuckets(bucketKeyFunc)
 	go func() {
 		defer close(upSert)
 		defer close(queries)
-		jobs := newTimeBuckets(bucketKeyFunc)
 		for {
 			select {
 			case job, ok := <-upSert:
@@ -26,15 +26,14 @@ func NewMemoryStore(bucketKeyFunc BucketKeyFunc) (chan Job, chan StoreQuery) {
 				if !ok {
 					queries = nil
 				}
-
-				jobs := jobs.getBefore(query)
+				jobs := jobs.findBucketsBefore(query)
 				err := query.ctx.Err()
 				if err == nil {
 					query.response <- jobs
 				}
 			}
-			if upSert == nil && queries == nil {
-				break
+			if upSert == nil || queries == nil {
+				panic("Upsert or queries closes")
 			}
 		}
 	}()
@@ -50,13 +49,17 @@ func UpSert(ctx context.Context, upSert chan Job, job Job) error {
 	return nil
 }
 
+// GetBeforeCriteria sets the criteria to add a job to search results by the GetBefore method.
+type GetBeforeCriteria func(jobs Job) bool
+
 // GetBefore ask for jobs whith status and with execution date before than the given one.
-func GetBefore(ctx context.Context, queries chan StoreQuery, date time.Time, statuses []Status) ([]Job, error) {
-	statusesMap := make(map[Status]bool)
-	for _, status := range statuses {
-		statusesMap[status] = true
-	}
-	query := StoreQuery{ctx: ctx, date: date, status: statusesMap, response: make(chan []Job)}
+func GetBefore(ctx context.Context, queries chan StoreQuery, date time.Time, criteria GetBeforeCriteria) ([]Job, error) {
+	query := StoreQuery{
+		ctx:      ctx,
+		date:     date,
+		response: make(chan []Job),
+		criteria: criteria}
+
 	defer close(query.response)
 	queries <- query
 	select {
@@ -74,8 +77,8 @@ func GetBefore(ctx context.Context, queries chan StoreQuery, date time.Time, sta
 type StoreQuery struct {
 	ctx      context.Context
 	date     time.Time
-	status   map[Status]bool
 	response chan []Job
+	criteria GetBeforeCriteria
 }
 
 func newTimeBuckets(bucketKeyFunc BucketKeyFunc) *jobs {
@@ -98,18 +101,14 @@ func (j *jobs) upsert(job Job) {
 	bucket.Jobs[job.ID] = job
 }
 
-func (j *jobs) getBefore(before StoreQuery) []Job {
-	return j.findBucketsBefore(before)
-}
-
-func (j *jobs) findBucketsBefore(before StoreQuery) []Job {
-	bucketKey := j.bucketKeyFunc(before.date)
+func (j *jobs) findBucketsBefore(query StoreQuery) []Job {
+	bucketKey := j.bucketKeyFunc(query.date)
 	bucket := j.headBucket
 	jobs := make([]Job, 0, 0)
 	for bucket != nil {
 		if bucket.bucketKey <= bucketKey {
 			for _, job := range bucket.Jobs {
-				if ok := before.status[job.Status]; ok {
+				if ok := query.criteria(job); ok {
 					jobs = append(jobs, job)
 				}
 			}
