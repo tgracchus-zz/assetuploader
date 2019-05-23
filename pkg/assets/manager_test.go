@@ -30,7 +30,7 @@ func TestS3AssetManager(t *testing.T) {
 	}
 
 	upsert, query := job.NewMemoryStore(job.MillisKeys)
-	expirationDuration := 1 * time.Second
+	expirationDuration := 2 * time.Second
 	scheduler := schedule.NewSimpleScheduler(upsert, query, expirationDuration)
 	manager := assets.News3AssetManager(session, region, scheduler, expirationDuration)
 	t.Run("TestUpdateIt", newTestUpdateIt(manager, bucket))
@@ -68,7 +68,7 @@ func newTestUpdateIt(manager assets.AssetManager, bucket string) func(t *testing
 		if err != nil {
 			t.Fatal(err)
 		}
-		time.Sleep(2 * time.Second)
+		time.Sleep(3 * time.Second)
 		getUrl, err := manager.GetURL(ctx, bucket, assetId, 15)
 		if err != nil {
 			t.Fatal(err)
@@ -107,6 +107,7 @@ func newTestOverwrite(manager assets.AssetManager, bucket string) func(t *testin
 		if err != nil {
 			t.Fatal(err)
 		}
+
 		req, err := http.NewRequest("PUT", putURL.String(), strings.NewReader("CONTENT"))
 		if err != nil {
 			fmt.Println("error creating request", putURL.String())
@@ -124,7 +125,7 @@ func newTestOverwrite(manager assets.AssetManager, bucket string) func(t *testin
 		if err != nil {
 			t.Fatal(err)
 		}
-		time.Sleep(2 * time.Second)
+		time.Sleep(3 * time.Second)
 		getUrl, err := manager.GetURL(ctx, bucket, assetId, 15)
 		if err != nil {
 			t.Fatal(err)

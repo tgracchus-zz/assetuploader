@@ -23,7 +23,7 @@ func TestAddAndGetJob(t *testing.T) {
 		t.Fatal(err)
 	}
 	time.Sleep(250 * time.Millisecond)
-	jobs, err := job.GetBefore(ctx, query, executionDate, []job.Status{expectedJob.Status})
+	jobs, err := job.GetBefore(ctx, query, executionDate, newStoreTestCriteria(expectedJob.Status))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,7 +40,7 @@ func TestGetBeforeCancelled(t *testing.T) {
 	executionDate := time.Now()
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	_, err := job.GetBefore(ctx, query, executionDate, []job.Status{job.ErrorStatus})
+	_, err := job.GetBefore(ctx, query, executionDate, newStoreTestCriteria(job.ErrorStatus))
 	if err == nil {
 		t.Fatal(err)
 	}
@@ -74,7 +74,7 @@ func TestUpdateJobStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 	time.Sleep(250 * time.Millisecond)
-	foundJobs, err := job.GetBefore(ctx, query, executionDate, []job.Status{newJob.Status})
+	foundJobs, err := job.GetBefore(ctx, query, executionDate, newStoreTestCriteria(newJob.Status))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +84,7 @@ func TestUpdateJobStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 	time.Sleep(250 * time.Millisecond)
-	updatedFoundJobs, err := job.GetBefore(ctx, query, executionDate, []job.Status{updatedJob.Status})
+	updatedFoundJobs, err := job.GetBefore(ctx, query, executionDate, newStoreTestCriteria(updatedJob.Status))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +141,7 @@ func TestAddJobPastInTime(t *testing.T) {
 	// Since JobStore follows PRAM consistency model,
 	// we need to wait for the add channel to be drained, so we can observe the two jobs
 	time.Sleep(250 * time.Millisecond)
-	foundJobs, err := job.GetBefore(ctx, query, now, []job.Status{newJob.Status})
+	foundJobs, err := job.GetBefore(ctx, query, now, newStoreTestCriteria(newJob.Status))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,5 +152,11 @@ func TestAddJobPastInTime(t *testing.T) {
 	foundJob := foundJobs[0]
 	if newJob.ID != foundJob.ID {
 		t.Fatal("Expected job and actual job do not match")
+	}
+}
+
+func newStoreTestCriteria(status job.Status) func(job job.Job) bool {
+	return func(job job.Job) bool {
+		return job.Status == status
 	}
 }
