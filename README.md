@@ -26,6 +26,20 @@ Otherwise the scrip will fail.
 build/run.sh
 ```
 
+### How to run with docker
+* Make sure to define:  
+export AWS_ACCESS_KEY_ID=XXXXX  
+export AWS_SECRET_ACCESS_KEY=XXXXXX  
+export AWS_REGION=XXXXX  
+export AWS_BUCKET=XXXXX  
+Otherwise the scrip will fail.  
+* Run
+```bash
+build/distribution.sh
+docker run -e AWS_ACCESS_KEY_ID="AKIASWEEC46WNIHR44WH" -e AWS_SECRET_ACCESS_KEY="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" -e AWS_REGION="eu-west-1" -e AWS_BUCKET="assetuploader-1" -it -p 8080:8080 assetuploader:1.0
+```
+
+
 ### How to run Test
 * Run  
 ```bash

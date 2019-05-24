@@ -11,3 +11,7 @@ for os in linux darwin; do
       shasum -a 1 $bynary | awk '{print $1}' > $bynary.sha1sum
       shasum -a 256 $bynary | awk '{print $1}' > $bynary.sha256sum
 done
+
+cp ../../distributions/assetuploader-${VERSION}-linux-x86_64 ../../distributions/assetuploader
+cd ../../
+docker build . -t assetuploader:${VERSION}
