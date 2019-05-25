@@ -1,6 +1,11 @@
 # Asset uploader
 
 ## How to
+
+### Prerequisites
+- Go 1.11 or above
+- go get github.com/tgracchus/assetuploader 
+
 ### How to create distributions
 ```bash
 build/distribution.sh
