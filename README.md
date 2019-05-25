@@ -65,7 +65,7 @@ helm del --purge assetuploader-1.0.0
 ```
 
 Minikube
-https://kubernetes.io/docs/tasks/access-application-cluster/ingress-minikube/
+https://kubernetes.io/docs/tasks/access-application-cluster/ingress-minikube/  
 https://stackoverflow.com/questions/42564058/how-to-use-local-docker-images-with-minikube
 
 ### How to run Test
