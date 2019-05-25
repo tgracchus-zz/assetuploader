@@ -4,6 +4,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/tgracchus/assetuploader/pkg/auerr"
 )
 
@@ -20,4 +21,9 @@ func NewAwsSession(cred *credentials.Credentials, region string) (*session.Sessi
 			aws.NewConfig().WithCredentials(cred).WithRegion(region),
 		),
 	), nil
+}
+
+// NewS3Client creates a new AWS s3 from the session.
+func NewS3Client(sess *session.Session, region string) *s3.S3 {
+	return s3.New(sess, aws.NewConfig().WithRegion(region))
 }

@@ -31,6 +31,7 @@ func main() {
 	if awsSecret == "" {
 		panic("AWS_SECRET_ACCESS_KEY should be present in env vars")
 	}
+
 	e := echo.New()
 	e.HTTPErrorHandler = endpoints.AssetUploaderHTTPErrorHandler
 	credentials := credentials.NewStaticCredentials(awsKey, awsSecret, "")
@@ -38,7 +39,9 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	manager := assets.NewDefaultFileManager(session, region)
+	svc := assets.NewS3Client(session, region)
+	manager := assets.NewDefaultFileManager(svc)
 	endpoints.RegisterAssetsEndpoints(e, manager, bucket)
+	endpoints.RegisterHealthCheck(e, svc, bucket)
 	e.Logger.Fatal(e.Start(":8080"))
 }

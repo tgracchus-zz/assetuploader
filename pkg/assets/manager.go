@@ -10,7 +10,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/google/uuid"
 	"github.com/tgracchus/assetuploader/pkg/auerr"
@@ -33,16 +32,15 @@ type AssetManager interface {
 }
 
 // NewDefaultFileManager creates an AssetManager based on s3 with scheduled execution.
-func NewDefaultFileManager(sess *session.Session, region string) AssetManager {
+func NewDefaultFileManager(svc *s3.S3) AssetManager {
 	upsert, query := job.NewMemoryStore(job.MinutesKeys)
 	expirationDuration := 30 * time.Second
 	scheduler := schedule.NewSimpleScheduler(upsert, query, expirationDuration)
-	return News3AssetManager(sess, region, scheduler, expirationDuration)
+	return News3AssetManager(svc, scheduler, expirationDuration)
 }
 
 // News3AssetManager creates an AssetManager based on s3 with custom configuration.
-func News3AssetManager(sess *session.Session, region string, scheduler schedule.SimpleScheduler, putExpirationTime time.Duration) AssetManager {
-	svc := s3.New(sess, aws.NewConfig().WithRegion(region))
+func News3AssetManager(svc *s3.S3, scheduler schedule.SimpleScheduler, putExpirationTime time.Duration) AssetManager {
 	return &s3AssetManager{
 		svc:               svc,
 		putExpirationTime: putExpirationTime,

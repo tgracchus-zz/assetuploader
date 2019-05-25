@@ -36,7 +36,7 @@ func NewMemoryStore(bucketKeyFunc BucketKeyFunc) (chan Job, chan StoreQuery) {
 
 			}
 			if upSert == nil || queries == nil {
-				panic("Upsert or queries closes")
+				panic("Upsert or queries closed")
 			}
 		}
 	}()
