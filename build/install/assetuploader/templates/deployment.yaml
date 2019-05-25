@@ -32,10 +32,39 @@ spec:
             httpGet:
               path: /healthcheck
               port: http
+            initialDelaySeconds: 5
+            periodSeconds: 2
+            successThreshold: 1
+            failureThreshold: 2
           readinessProbe:
             httpGet:
               path: /healthcheck
               port: http
+            initialDelaySeconds: 5
+            periodSeconds: 2
+            successThreshold: 3
+            failureThreshold: 2
+          env:
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: assetuploader
+                  key: AWS_ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: assetuploader
+                  key: AWS_SECRET_ACCESS_KEY
+            - name: AWS_REGION
+              valueFrom:
+                secretKeyRef:
+                  name: assetuploader
+                  key: AWS_REGION
+            - name: AWS_BUCKET
+              valueFrom:
+                secretKeyRef:
+                  name: assetuploader
+                  key: AWS_BUCKET
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       {{- with .Values.nodeSelector }}

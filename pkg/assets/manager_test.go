@@ -36,11 +36,12 @@ func TestS3AssetManager(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	svc := assets.NewS3Client(session, region)
 
 	upsert, query := job.NewMemoryStore(job.MillisKeys)
 
 	scheduler := schedule.NewSimpleScheduler(upsert, query, tickPeriod)
-	manager := assets.News3AssetManager(session, region, scheduler, expirationDuration)
+	manager := assets.News3AssetManager(svc, scheduler, expirationDuration)
 	t.Run("TestUpdateIt", newTestUpdateIt(manager, bucket))
 	t.Run("TestOverwrite", newTestOverwrite(manager, bucket))
 	t.Run("TestUpdateItFileDoesNotExist", newTestUpdateItFileDoesNotExist(manager, bucket))

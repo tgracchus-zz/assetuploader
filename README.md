@@ -26,7 +26,7 @@ Otherwise the scrip will fail.
 build/run.sh
 ```
 
-### How to run with docker
+### How to build a docker
 * Make sure to define:  
 export AWS_ACCESS_KEY_ID=XXXXX  
 export AWS_SECRET_ACCESS_KEY=XXXXXX  
@@ -35,10 +35,33 @@ export AWS_BUCKET=XXXXX
 Otherwise the scrip will fail.  
 * Run
 ```bash
-build/distribution.sh
-docker run -e AWS_ACCESS_KEY_ID="XXXXXX" -e AWS_SECRET_ACCESS_KEY="XXXXXX" -e AWS_REGION="eu-west-1" -e AWS_BUCKET="assetuploader-1" -it -p 8080:8080 assetuploader:1.0
+build/docker.sh
+```
+To run it:
+```bash
+docker run -e AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}" -e AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}" -e AWS_REGION="${AWS_REGION}" -e AWS_BUCKET="${AWS_BUCKET}" -it -p 8080:8080 assetuploader:1.0
 ```
 
+### How to k8s
+Deploy  
+```bash
+export AWS_ACCESS_KEY_ID_ENC=$(echo -n $AWS_ACCESS_KEY_ID| base64)  
+export AWS_SECRET_ACCESS_KEY_ENC=$(echo -n $AWS_SECRET_ACCESS_KEY| base64)  
+export AWS_REGION_ENC=$(echo -n $AWS_REGION| base64)  
+export AWS_BUCKET_ENC=$(echo -n $AWS_BUCKET| base64)  
+helm install --name="assetuploader-1.0.0" --set-string secrets.aws.awsAccessKeyID="${AWS_ACCESS_KEY_ID_ENC}" --set-string secrets.aws.awsSecretAccessKey="${AWS_SECRET_ACCESS_KEY_ENC}" --set-string secrets.aws.awsRegion="${AWS_REGION_ENC}" --set-string secrets.aws.awsBucket="${AWS_BUCKET_ENC}" build/install/assetuploader
+```
+
+
+
+Delete  
+```bash
+helm del --purge assetuploader-1.0.0
+```
+
+Minikube
+https://kubernetes.io/docs/tasks/access-application-cluster/ingress-minikube/
+https://stackoverflow.com/questions/42564058/how-to-use-local-docker-images-with-minikube
 
 ### How to run Test
 * Run  
@@ -252,19 +275,3 @@ https://golang.github.io/dep/
 https://docs.aws.amazon.com/sdk-for-go/api/service/s3/
 
 
-
-
-
-
-
-
-
-
-
-https://kubernetes.io/docs/tasks/access-application-cluster/ingress-minikube/
-https://stackoverflow.com/questions/42564058/how-to-use-local-docker-images-with-minikube
-
-helm install --name="assetuploader-1.0.0" build/install/assetuploader
-helm delete assetuploader-1.0.0 
-
-helm del --purge assetuploader-1.0.0

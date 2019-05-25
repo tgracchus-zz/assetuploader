@@ -7,7 +7,7 @@ replicaCount: 3
 image:
   repository: assetuploader
   tag: 1.0.0
-  pullPolicy: Never
+  pullPolicy: IfNotPresent
 
 imagePullSecrets: []
 nameOverride: ""
@@ -17,6 +17,13 @@ service:
   type: ClusterIP
   port: 8080
 
+secrets:
+  aws:
+    awsAccessKeyID: ""
+    awsSecretAccessKey: ""
+    awsRegion: ""
+    awsBucket: ""
+
 ingress:
   enabled: true
   annotations: 
@@ -25,7 +32,6 @@ ingress:
   hosts:
     - host: assetuploader.local
       paths: ["/"]
-
   tls: []
   #  - secretName: chart-example-tls
   #    hosts:
