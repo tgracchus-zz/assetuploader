@@ -11,8 +11,8 @@ import (
 func NewMemoryStore(bucketKeyFunc BucketKeyFunc) (chan Job, chan StoreQuery) {
 	upSert := make(chan Job, 1000)
 	queries := make(chan StoreQuery, 1000)
-	jobs := newTimeBuckets(bucketKeyFunc)
 	go func() {
+		jobs := newTimeBuckets(bucketKeyFunc)
 		defer close(upSert)
 		defer close(queries)
 		for {

@@ -36,7 +36,7 @@ Otherwise the scrip will fail.
 * Run
 ```bash
 build/distribution.sh
-docker run -e AWS_ACCESS_KEY_ID="AKIASWEEC46WNIHR44WH" -e AWS_SECRET_ACCESS_KEY="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" -e AWS_REGION="eu-west-1" -e AWS_BUCKET="assetuploader-1" -it -p 8080:8080 assetuploader:1.0
+docker run -e AWS_ACCESS_KEY_ID="XXXXXX" -e AWS_SECRET_ACCESS_KEY="XXXXXX" -e AWS_REGION="eu-west-1" -e AWS_BUCKET="assetuploader-1" -it -p 8080:8080 assetuploader:1.0
 ```
 
 
@@ -259,3 +259,12 @@ https://docs.aws.amazon.com/sdk-for-go/api/service/s3/
 
 
 
+
+
+https://kubernetes.io/docs/tasks/access-application-cluster/ingress-minikube/
+https://stackoverflow.com/questions/42564058/how-to-use-local-docker-images-with-minikube
+
+helm install --name="assetuploader-1.0.0" build/install/assetuploader
+helm delete assetuploader-1.0.0 
+
+helm del --purge assetuploader-1.0.0

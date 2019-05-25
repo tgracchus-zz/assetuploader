@@ -40,5 +40,6 @@ func main() {
 	}
 	manager := assets.NewDefaultFileManager(session, region)
 	endpoints.RegisterAssetsEndpoints(e, manager, bucket)
+	endpoints.RegisterHealthCheck(e, session)
 	e.Logger.Fatal(e.Start(":8080"))
 }

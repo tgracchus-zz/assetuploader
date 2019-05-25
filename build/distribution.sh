@@ -2,7 +2,7 @@
 rm -rf distributions
 mkdir -p distributions
 cd cmd/assetuploader
-VERSION="1.0"
+VERSION="1.0.0"
 for os in linux darwin; do
       echo "building for ${os} ${arch}"
       bynary=../../distributions/assetuploader-${VERSION}-${os}-x86_64
