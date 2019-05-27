@@ -254,7 +254,22 @@ Response code | Description
 In the PUT ​​/asset/<asset-id> endpoint we mark the asset as completed. 
 This is done with a tag in the uploaded object. Since tags are eventually consistent,
 it might take a bit longer after the object is marked as uploaded. But, since the ### PUT ​​/asset/<asset-id> 
-is async, it does not matter.
+is async, it does not matter.  
+
+
+### GET ​​/healtcheck  
+* **Description:**   
+Returns 200 if we have connection to s3, otherwise it will return 503  
+
+* **Response:**  
+```
+{ ​​​"Status":​​"UP" } 
+```
+
+Response code | Description
+------------ | -------------
+200 | Service ok
+503 | If we can operate because we do not have access to s3
 
 
 ## Solution concurreny model.
